@@ -1,0 +1,20 @@
+[package]
+name = "spacecraft"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ash = "0.38.0"
+ash-window = "0.13.0"
+env_logger = "0.11.5"
+glam = "0.29.0"
+hecs = "0.10.5"
+log = "0.4.22"
+raw-window-handle = "0.6.2"
+softbuffer = "0.4.6"
+vk-shader-macros = "0.2.10"
+winit = "0.30.13"
+
+[features]
+default = []
+perf-measurements = []
