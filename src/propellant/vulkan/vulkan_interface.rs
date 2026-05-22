@@ -1,10 +1,7 @@
-
 use super::utils::VkShared;
 use ash::vk;
 
-
-
-/// Extensions that are required to run spacecraft
+/// Extensions that are required to run supernova
 /// This shall match vulka::physical_deice::REQUIRED_DEVICE_EXTENSIONS
 const REQUIRED_DEVICE_EXTENSIONS: &[*const i8] = &[
     ash::vk::KHR_SWAPCHAIN_NAME.as_ptr(),
@@ -24,13 +21,11 @@ impl std::ops::Deref for QueueInterface {
     }
 }
 
-
 // Should this be implemented as a trait, avoid to use before thinking about the best way to implement this
 pub trait VulkanPhysicalProperties {
     fn get_physical_device_properties(&self) -> &ash::vk::PhysicalDeviceProperties;
     fn get_physical_device_memory_properties(&self) -> &ash::vk::PhysicalDeviceMemoryProperties;
 }
-
 
 /// Structure that contains all the vulkan stuff used and needed by the renderer.
 /// This is owned by the renderer, as it is used every frame.
@@ -50,9 +45,8 @@ impl VulkanInterface {
     pub fn create(
         vk_instance: &ash::Instance,
         physical_device: ash::vk::PhysicalDevice,
-        indices: &crate::vulkan::QueueFamilyIndices
+        indices: &crate::propellant::vulkan::QueueFamilyIndices,
     ) -> Result<VulkanInterface, crate::ScError> {
-
         // at most, we will have 4 queues from the same queue family, so we'll need a list of at most 4 elements
         let queue_priorities = [1.0; 4];
 
@@ -70,65 +64,81 @@ impl VulkanInterface {
             match queue_create_infos.get_mut(&present_index) {
                 Some(create_info) => create_info.queue_count += 1,
                 None => {
-                    queue_create_infos.insert(present_index, ash::vk::DeviceQueueCreateInfo {
-                        queue_count: 1,
-                        queue_family_index: present_index,
-                        p_queue_priorities: queue_priorities.as_ptr(),
-                        ..Default::default()
-                    });
+                    queue_create_infos.insert(
+                        present_index,
+                        ash::vk::DeviceQueueCreateInfo {
+                            queue_count: 1,
+                            queue_family_index: present_index,
+                            p_queue_priorities: queue_priorities.as_ptr(),
+                            ..Default::default()
+                        },
+                    );
                 }
             }
         }
-        
+
         if let Some((transfer_index, _)) = indices.transfer {
             match queue_create_infos.get_mut(&transfer_index) {
                 Some(create_info) => create_info.queue_count += 1,
                 None => {
-                    queue_create_infos.insert(transfer_index, ash::vk::DeviceQueueCreateInfo {
-                        queue_count: 1,
-                        queue_family_index: transfer_index,
-                        p_queue_priorities: queue_priorities.as_ptr(),
-                        ..Default::default()
-                    });
+                    queue_create_infos.insert(
+                        transfer_index,
+                        ash::vk::DeviceQueueCreateInfo {
+                            queue_count: 1,
+                            queue_family_index: transfer_index,
+                            p_queue_priorities: queue_priorities.as_ptr(),
+                            ..Default::default()
+                        },
+                    );
                 }
             }
         }
-        
+
         if let Some((compute_index, _)) = indices.compute {
             match queue_create_infos.get_mut(&compute_index) {
                 Some(create_info) => create_info.queue_count += 1,
                 None => {
-                    queue_create_infos.insert(compute_index, ash::vk::DeviceQueueCreateInfo {
-                        queue_count: 1,
-                        queue_family_index: compute_index,
-                        p_queue_priorities: queue_priorities.as_ptr(),
-                        ..Default::default()
-                    });
+                    queue_create_infos.insert(
+                        compute_index,
+                        ash::vk::DeviceQueueCreateInfo {
+                            queue_count: 1,
+                            queue_family_index: compute_index,
+                            p_queue_priorities: queue_priorities.as_ptr(),
+                            ..Default::default()
+                        },
+                    );
                 }
             }
         }
 
         let queue_create_infos = queue_create_infos.into_values().collect::<Vec<_>>();
-        
+
         // TODO: we already have a required device feature ? See crate::vulkan::physical_devices
-        let features = ash::vk::PhysicalDeviceFeatures {
-            ..Default::default()
-        };
-        
+        let features = ash::vk::PhysicalDeviceFeatures { ..Default::default() };
+
         for extension in REQUIRED_DEVICE_EXTENSIONS.iter() {
             if extension.is_null() {
                 log::warn!("Device extension name pointer is null!!");
-            }
-            else {
-                log::info!("Using device extension {:#?}", unsafe { std::ffi::CStr::from_ptr(*extension) });
+            } else {
+                log::info!("Using device extension {:#?}", unsafe {
+                    std::ffi::CStr::from_ptr(*extension)
+                });
             }
         }
 
         let info = ash::vk::DeviceCreateInfo {
             queue_create_info_count: queue_create_infos.len() as u32,
-            p_queue_create_infos: if queue_create_infos.is_empty() { std::ptr::null() } else { queue_create_infos.as_ptr() },
+            p_queue_create_infos: if queue_create_infos.is_empty() {
+                std::ptr::null()
+            } else {
+                queue_create_infos.as_ptr()
+            },
             enabled_extension_count: REQUIRED_DEVICE_EXTENSIONS.len() as u32,
-            pp_enabled_extension_names: if REQUIRED_DEVICE_EXTENSIONS.is_empty() { std::ptr::null() } else { REQUIRED_DEVICE_EXTENSIONS.as_ptr() },
+            pp_enabled_extension_names: if REQUIRED_DEVICE_EXTENSIONS.is_empty() {
+                std::ptr::null()
+            } else {
+                REQUIRED_DEVICE_EXTENSIONS.as_ptr()
+            },
             p_enabled_features: &features,
             ..Default::default()
         };
@@ -187,7 +197,6 @@ impl VulkanInterface {
         &self.device
     }
 
-
     pub fn get_physical_device(&self) -> &ash::vk::PhysicalDevice {
         &self.physical_device
     }
@@ -220,13 +229,12 @@ impl VulkanInterface {
     pub fn destroy(&mut self) {
         unsafe {
             match self.device.device_wait_idle() {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => log::warn!("Failed to wait device idle for cleanup: {e}"),
             }
             self.device.destroy_device(None);
         }
     }
-
 }
 
 impl VulkanPhysicalProperties for VulkanInterface {
@@ -238,7 +246,6 @@ impl VulkanPhysicalProperties for VulkanInterface {
         &self.physical_device_memory_properties
     }
 }
-
 
 enum OwnOrSharedQueue {
     Owned(QueueInterface),
@@ -259,7 +266,7 @@ pub struct VkRendererInterface {
     graphics_queue: VkShared<QueueInterface>,
     present_queue: VkShared<QueueInterface>,
     physical_device_properties: vk::PhysicalDeviceProperties,
-    physical_device_memory_properties: vk::PhysicalDeviceMemoryProperties
+    physical_device_memory_properties: vk::PhysicalDeviceMemoryProperties,
 }
 
 impl std::ops::Deref for VkRendererInterface {
@@ -283,22 +290,30 @@ impl VkRendererInterface {
     pub fn load_shader(&self, byte_code: &[u32]) -> Result<ash::vk::ShaderModule, crate::ScError> {
         let create_info = ash::vk::ShaderModuleCreateInfo {
             code_size: byte_code.len() * std::mem::size_of::<u32>(),
-            p_code: if byte_code.is_empty() { std::ptr::null() } else { byte_code.as_ptr() },
+            p_code: if byte_code.is_empty() {
+                std::ptr::null()
+            } else {
+                byte_code.as_ptr()
+            },
             ..Default::default()
         };
         Ok(unsafe { self.device.create_shader_module(&create_info, None)? })
     }
 
-    pub fn graphics_queue(&self) -> &QueueInterface { &self.graphics_queue }
+    pub fn graphics_queue(&self) -> &QueueInterface {
+        &self.graphics_queue
+    }
 
-    pub fn present_queue(&self) -> &QueueInterface { &self.present_queue }
+    pub fn present_queue(&self) -> &QueueInterface {
+        &self.present_queue
+    }
 }
 
 pub struct VkAssetManagerInterface {
     pub device: VkShared<ash::Device>,
     pub transfer_queue: VkShared<QueueInterface>,
-    physical_device_properties: vk::PhysicalDeviceProperties ,
-    physical_device_memory_properties: vk::PhysicalDeviceMemoryProperties
+    physical_device_properties: vk::PhysicalDeviceProperties,
+    physical_device_memory_properties: vk::PhysicalDeviceMemoryProperties,
 }
 
 impl std::ops::Deref for VkAssetManagerInterface {
@@ -364,10 +379,16 @@ impl CommandInterface {
     }
 
     pub fn destroy(&mut self, device: &ash::Device) {
-        unsafe { device.destroy_command_pool(self.command_pool, None); }
+        unsafe {
+            device.destroy_command_pool(self.command_pool, None);
+        }
     }
 
-    fn create_command_buffers(device: &ash::Device, command_pool: ash::vk::CommandPool, frame_count: u32) -> Result<Vec<ash::vk::CommandBuffer>, crate::ScError> {
+    fn create_command_buffers(
+        device: &ash::Device,
+        command_pool: ash::vk::CommandPool,
+        frame_count: u32,
+    ) -> Result<Vec<ash::vk::CommandBuffer>, crate::ScError> {
         let allocate_info = ash::vk::CommandBufferAllocateInfo {
             command_pool,
             level: ash::vk::CommandBufferLevel::PRIMARY,
@@ -377,7 +398,6 @@ impl CommandInterface {
         Ok(unsafe { device.allocate_command_buffers(&allocate_info)? })
     }
 }
-
 
 pub struct InRecordingCommandBuffer(VkShared<ash::vk::CommandBuffer>);
 
@@ -408,8 +428,16 @@ impl std::ops::Deref for RecordedCommandBuffer {
 }
 
 impl RecordedCommandBuffer {
-    pub fn queue_submit(self, device: &ash::Device, queue: ash::vk::Queue, submit_infos: &[ash::vk::SubmitInfo], fence: ash::vk::Fence) -> Result<(), crate::ScError> {
-        unsafe { device.queue_submit(queue, submit_infos, fence)?; }
+    pub fn queue_submit(
+        self,
+        device: &ash::Device,
+        queue: ash::vk::Queue,
+        submit_infos: &[ash::vk::SubmitInfo],
+        fence: ash::vk::Fence,
+    ) -> Result<(), crate::ScError> {
+        unsafe {
+            device.queue_submit(queue, submit_infos, fence)?;
+        }
         Ok(())
     }
 }

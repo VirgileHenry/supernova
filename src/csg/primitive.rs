@@ -1,204 +1,289 @@
+use crate::csg::types::Float;
+use crate::csg::types::Quat;
+use crate::csg::types::Vec3;
 
-#[derive(Debug, Clone, Copy)]
-pub enum Primitive {
-    Sphere {
-        /// Position of the center of the sphere
-        offset: crate::types::Vec3,
-        /// Radius of the sphere
-        radius: crate::types::Float,
-    },
-    Cube {
-        /// Position of the center of the cube
-        offset: crate::types::Vec3,
-        /// Size of the cube (width, height, depth)
-        size: crate::types::Vec3,
-        /// Rotation of the cube
-        rotation: glam::Quat,
-    },
-    Torus {
-        /// Position of the center of the torus
-        offset: crate::types::Vec3,
-        /// Normal of the plane in which is inscribed the coplanar circular axis
-        normal: crate::types::Vec3,
-        /// Distance between center and torus circle
-        inner_radius: crate::types::Float,
-        /// Distance between the torus circle and edge
-        outter_radius: crate::types::Float,
-    },
-    CubeFrame {
-        /// Position of the center of the frame
-        offset: crate::types::Vec3,
-        /// Size of the frame (width, height, depth)
-        size: crate::types::Vec3,
-        /// Rotation of the frame
-        rotation: crate::types::Quat,
-        /// Thickness of the frame
-        thickness: crate::types::Float,
-    },
-    Cone {
-        /// Position of the center of the base
-        offset: crate::types::Vec3,
-        /// Direction towards the top
-        pointing_towards: crate::types::Vec3,
-        /// Distance between the base and the top
-        height: crate::types::Float,
-        /// Radius of the base
-        base_radius: crate::types::Float,
-    },
-    Triangle {
-        /// Point A of triangle
-        a: crate::types::Vec3,
-        /// Point B of triangle
-        b: crate::types::Vec3,
-        /// Point C of triangle
-        c: crate::types::Vec3,
-    },
-    RegularHexagon {
-        /// Center of the hexagon
-        offset: crate::types::Vec3,
-        /// Normal to the hexagon place
-        normal: crate::types::Vec3,
-        /// Distance between the center of the hexagon and the corners
-        radius: crate::types::Float,
-    },
-    Capsule {
-        /// Center of the first extremity sphere of the capsule
-        a: crate::types::Vec3,
-        /// Center of the second extremity sphere of the capsule
-        b: crate::types::Vec3,
-        /// Radius of the capsule
-        radius: crate::types::Float,
-    },
-    Cylinder {
-        /// First extremity of the the cylinder
-        a: crate::types::Vec3,
-        /// Second extremity of the the cylinder
-        b: crate::types::Vec3,
-        /// Radius of the cylinder
-        radius: crate::types::Float,
-    },
-    Ellipse {
-        /// First center of the ellipse
-        a: crate::types::Vec3,
-        /// Second center of the ellipse
-        b: crate::types::Vec3,
-        /// Radius of the Ellipse
-        radius: crate::types::Float,
-    },
-    Octahedron {
-        /// Center of the Octahedron
-        offset: crate::types::Vec3,
-        /// Size of the Octahedron
-        size: crate::types::Float,
-        /// Rotation of the Octahedron
-        rotation: crate::types::Quat,
-    },
-    Pyramid {
-        /// Center of the Pyramid
-        offset: crate::types::Vec3,
-        /// Size of the Pyramid
-        size: crate::types::Float,
-        /// Rotation of the Pyramid
-        rotation: crate::types::Quat,
-    },
+/// Helper: pack a Vec3 into three slots of the params array.
+fn pack_vec3(out: &mut [f32; 12], at: usize, v: Vec3) {
+    out[at] = v.x;
+    out[at + 1] = v.y;
+    out[at + 2] = v.z;
 }
 
-impl Primitive {
-    pub(super) const VAR_COUNT: u32 = 12;
+/// Helper: pack a quaternion into 4 slots of the params array.
+fn pack_quat(out: &mut [f32; 12], at: usize, q: Quat) {
+    out[at] = q.x;
+    out[at + 1] = q.y;
+    out[at + 2] = q.z;
+    out[at + 3] = q.w;
+}
 
-    pub(super) fn id(&self) -> u32 {
-        match self {
-            Primitive::Sphere { .. } => 0,
-            Primitive::Cube { .. } => 1,
-            Primitive::Torus { .. } => 2,
-            Primitive::CubeFrame { .. } => 3,
-            Primitive::Cone { .. } => 4,
-            Primitive::Triangle { .. } => 5,
-            Primitive::RegularHexagon { .. } => 6,
-            Primitive::Capsule { .. } => 7,
-            Primitive::Cylinder { .. } => 8,
-            Primitive::Ellipse { .. } => 9,
-            Primitive::Octahedron { .. } => 10,
-            Primitive::Pyramid { .. } => 11,
-        }
-    }
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Sphere {
+    pub offset: Vec3,
+    pub radius: Float,
+}
 
-    pub fn sphere(radius: crate::types::Float) -> Primitive {
-        Primitive::Sphere { 
-            radius,
-            offset: crate::types::Vec3::ZERO,
-        }
-    }
-
-    pub fn cylinder(radius: crate::types::Float) -> Primitive {
-        Primitive::Cylinder {
-            a: crate::types::Vec3::X,
-            b: crate::types::Vec3::NEG_X,
+impl Sphere {
+    pub fn new(radius: Float) -> Self {
+        Self {
+            offset: Vec3::ZERO,
             radius,
         }
     }
 
-    pub fn cube(size: crate::types::Vec3) -> Primitive {
-        Primitive::Cube {
-            offset: crate::types::Vec3::ZERO,
+    pub fn at(self, offset: Vec3) -> Self {
+        Self { offset, ..self }
+    }
+}
+
+impl crate::csg::CsgNode for Sphere {
+    const OPCODE: u32 = crate::csg::opcodes::SPHERE;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.offset);
+        p[3] = self.radius;
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Cube {
+    pub offset: Vec3,
+    pub size: Vec3,
+    pub rotation: Quat,
+}
+
+impl Cube {
+    pub fn new(size: Vec3) -> Self {
+        Self {
+            offset: Vec3::ZERO,
             size,
-            rotation: crate::types::Quat::IDENTITY,
+            rotation: Quat::IDENTITY,
         }
     }
 
-    pub fn at(self, offset: crate::types::Vec3) -> Primitive {
-        match self {
-            Primitive::Sphere { radius, .. } => Primitive::Sphere { radius, offset },
-            Primitive::Cube { size, rotation, .. } => Primitive::Cube { offset, size, rotation },
-            Primitive::Cylinder { a, b, radius } => Primitive::Cylinder { a: (a - b) * 0.5 + offset, b: (b - a) * 0.5 + offset, radius },
-            // TODO: continue this consrtuctor
-            #[allow(unreachable_patterns)]
-            _ => panic!("Primitive building error: `at` builder not defined for {self:?}")
+    pub fn at(self, offset: Vec3) -> Self {
+        Self { offset, ..self }
+    }
+}
+
+impl crate::csg::CsgNode for Cube {
+    const OPCODE: u32 = crate::csg::opcodes::CUBE;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.offset);
+        pack_vec3(&mut p, 3, self.size);
+        pack_quat(&mut p, 6, self.rotation);
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Torus {
+    pub offset: Vec3,
+    pub normal: Vec3,
+    pub inner_radius: Float,
+    pub outer_radius: Float,
+}
+
+impl crate::csg::CsgNode for Torus {
+    const OPCODE: u32 = crate::csg::opcodes::TORUS;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.offset);
+        pack_vec3(&mut p, 3, self.normal);
+        p[6] = self.inner_radius;
+        p[7] = self.outer_radius;
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CubeFrame {
+    pub offset: Vec3,
+    pub size: Vec3,
+    pub rotation: Quat,
+    pub thickness: Float,
+}
+
+impl crate::csg::CsgNode for CubeFrame {
+    const OPCODE: u32 = crate::csg::opcodes::CUBE_FRAME;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.offset);
+        pack_vec3(&mut p, 3, self.size);
+        // Rotation eats 4 floats but we only have 12 total; pack quat into
+        // slots 6..10 and put thickness at 10. Slot 11 unused.
+        pack_quat(&mut p, 6, self.rotation);
+        p[10] = self.thickness;
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Cone {
+    pub offset: Vec3,
+    pub pointing_towards: Vec3,
+    pub height: Float,
+    pub base_radius: Float,
+}
+
+impl crate::csg::CsgNode for Cone {
+    const OPCODE: u32 = crate::csg::opcodes::CONE;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.offset);
+        pack_vec3(&mut p, 3, self.pointing_towards);
+        p[6] = self.height;
+        p[7] = self.base_radius;
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Triangle {
+    pub a: Vec3,
+    pub b: Vec3,
+    pub c: Vec3,
+}
+
+impl crate::csg::CsgNode for Triangle {
+    const OPCODE: u32 = crate::csg::opcodes::TRIANGLE;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.a);
+        pack_vec3(&mut p, 3, self.b);
+        pack_vec3(&mut p, 6, self.c);
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct RegularHexagon {
+    pub offset: Vec3,
+    pub normal: Vec3,
+    pub radius: Float,
+}
+
+impl crate::csg::CsgNode for RegularHexagon {
+    const OPCODE: u32 = crate::csg::opcodes::REGULAR_HEXAGON;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.offset);
+        pack_vec3(&mut p, 3, self.normal);
+        p[6] = self.radius;
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Capsule {
+    pub a: Vec3,
+    pub b: Vec3,
+    pub radius: Float,
+}
+
+impl crate::csg::CsgNode for Capsule {
+    const OPCODE: u32 = crate::csg::opcodes::CAPSULE;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.a);
+        pack_vec3(&mut p, 3, self.b);
+        p[6] = self.radius;
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Cylinder {
+    pub a: Vec3,
+    pub b: Vec3,
+    pub radius: Float,
+}
+
+impl Cylinder {
+    pub fn new(radius: Float) -> Self {
+        Self {
+            a: Vec3::X,
+            b: Vec3::NEG_X,
+            radius,
         }
     }
+}
 
-    pub fn bounding_box(&self) -> crate::types::Float {
-        match self {
-            Primitive::Sphere { offset, radius } => offset.length() + radius,
-            Primitive::Cube { offset, size, .. } =>
-                ((size.x * size.x) + (size.y * size.y) + (size.z * size.z)) + offset.length(),
-            Primitive::Torus { inner_radius, outter_radius, offset, .. } => 
-                inner_radius + outter_radius + offset.length(),
-            Primitive::CubeFrame { offset, size, thickness, .. } =>
-                ((size.x * size.x) + (size.y * size.y) + (size.z * size.z)) + offset.length() + (thickness * 0.5),
-            Primitive::Cone { offset, height, base_radius, .. } => 
-                offset.length() + height.max(*base_radius),
-            Primitive::Triangle { a, b, c, } => 
-                a.length().max(b.length()).max(c.length()),
-            Primitive::RegularHexagon { offset, radius, .. } => 
-                offset.length() + radius,
-            Primitive::Capsule { a, b, radius } => 
-                a.length().max(b.length()) + radius,
-            Primitive::Cylinder { a, b, radius } => 
-                a.length().max(b.length()) + radius,
-            Primitive::Ellipse { a, b, radius } => 
-                a.length().max(b.length()) + radius,
-            Primitive::Octahedron { offset, size, .. } => 
-                offset.length() + size,
-            Primitive::Pyramid { offset, size, .. } => 
-                offset.length() + size,
-        }
+impl crate::csg::CsgNode for Cylinder {
+    const OPCODE: u32 = crate::csg::opcodes::CYLINDER;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.a);
+        pack_vec3(&mut p, 3, self.b);
+        p[6] = self.radius;
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
     }
+}
 
-    pub fn pretty_print<W: std::io::Write>(&self, output: &mut W) -> Result<(), std::io::Error> {
-        match self {
-            Primitive::Sphere { .. } => write!(output, "Sphere"),
-            Primitive::Cube { .. } => write!(output, "Cube"),
-            Primitive::Torus { .. } => write!(output, "Torus"),
-            Primitive::CubeFrame { .. } => write!(output, "CubeFrame"),
-            Primitive::Cone { .. } => write!(output, "Cone"),
-            Primitive::Triangle { .. } => write!(output, "Triangle"),
-            Primitive::RegularHexagon { .. } => write!(output, "RegularHexagon"),
-            Primitive::Capsule { .. } => write!(output, "Capsule"),
-            Primitive::Cylinder { .. } => write!(output, "Cylinder"),
-            Primitive::Ellipse { .. } => write!(output, "Ellipse"),
-            Primitive::Octahedron { .. } => write!(output, "Octahedron"),
-            Primitive::Pyramid { .. } => write!(output, "Pyramid"),
-        }
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Ellipse {
+    pub a: Vec3,
+    pub b: Vec3,
+    pub radius: Float,
+}
+
+impl crate::csg::CsgNode for Ellipse {
+    const OPCODE: u32 = crate::csg::opcodes::ELLIPSE;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.a);
+        pack_vec3(&mut p, 3, self.b);
+        p[6] = self.radius;
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Octahedron {
+    pub offset: Vec3,
+    pub size: Float,
+    pub rotation: Quat,
+}
+
+impl crate::csg::CsgNode for Octahedron {
+    const OPCODE: u32 = crate::csg::opcodes::OCTAHEDRON;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.offset);
+        p[3] = self.size;
+        pack_quat(&mut p, 4, self.rotation);
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Pyramid {
+    pub offset: Vec3,
+    pub size: Float,
+    pub rotation: Quat,
+}
+
+impl crate::csg::CsgNode for Pyramid {
+    const OPCODE: u32 = crate::csg::opcodes::PYRAMID;
+    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+        let mut p = [0.0; 12];
+        pack_vec3(&mut p, 0, self.offset);
+        p[3] = self.size;
+        pack_quat(&mut p, 4, self.rotation);
+        crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
     }
 }

@@ -1,8 +1,8 @@
 use crate::propellant::renderer::shaders;
-use crate::vulkan::VkRendererInterface;
+use crate::propellant::vulkan;
 
 pub struct GeometryPassInput {
-    pub command_buffer: crate::vulkan::InRecordingCommandBuffer,
+    pub command_buffer: vulkan::InRecordingCommandBuffer,
     pub render_area: ash::vk::Rect2D,
 }
 
@@ -21,7 +21,7 @@ impl super::RenderingPass for GeometryPass {
     type In = GeometryPassInput;
     type Out = GeometryPassOutput;
 
-    fn render(&self, _world: &hecs::World, vi: &VkRendererInterface, input: &Self::In, out: &mut Self::Out) {
+    fn render(&self, _world: &hecs::World, vi: &vulkan::VkRendererInterface, input: &Self::In, out: &mut Self::Out) {
         // temp rendering code here!
 
         let clear_color = ash::vk::ClearValue {
@@ -56,8 +56,8 @@ impl super::RenderingPass for GeometryPass {
 
 impl GeometryPass {
     pub fn create(
-        vulkan_interface: &VkRendererInterface,
-        swapchain: &crate::vulkan::Swapchain,
+        vulkan_interface: &vulkan::VkRendererInterface,
+        swapchain: &vulkan::Swapchain,
     ) -> Result<GeometryPass, crate::ScError> {
         let vertex_shader = vulkan_interface.load_shader(shaders::EXAMPLE_VERT.code)?;
         let fragment_shader = vulkan_interface.load_shader(shaders::EXAMPLE_FRAG.code)?;
@@ -196,7 +196,7 @@ impl GeometryPass {
         self.render_pass
     }
 
-    pub fn destroy(&self, vulkan_interface: &VkRendererInterface) {
+    pub fn destroy(&self, vulkan_interface: &vulkan::VkRendererInterface) {
         unsafe {
             vulkan_interface.destroy_pipeline(self.pipeline, None);
             vulkan_interface.destroy_pipeline_layout(self.pipeline_layout, None);
@@ -205,8 +205,8 @@ impl GeometryPass {
     }
 
     fn create_render_pass(
-        vulkan_interface: &VkRendererInterface,
-        swapchain: &crate::vulkan::Swapchain,
+        vulkan_interface: &vulkan::VkRendererInterface,
+        swapchain: &vulkan::Swapchain,
     ) -> Result<ash::vk::RenderPass, crate::ScError> {
         let color_attachment = ash::vk::AttachmentDescription {
             format: swapchain.format(),

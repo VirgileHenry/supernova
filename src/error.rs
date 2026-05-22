@@ -6,6 +6,7 @@ pub enum ScError {
     OsError(winit::error::OsError),
     EventLoop(winit::error::EventLoopError),
     SoftBuffer(softbuffer::SoftBufferError),
+    Io(std::io::Error),
 }
 
 impl std::fmt::Display for ScError {
@@ -17,6 +18,7 @@ impl std::fmt::Display for ScError {
             ScError::OsError(error) => write!(f, "OsError error: {error}"),
             ScError::EventLoop(error) => write!(f, "EventLoop error: {error}"),
             ScError::SoftBuffer(error) => write!(f, "SoftBuffer error: {error}"),
+            ScError::Io(error) => write!(f, "I/O error: {error}"),
         }
     }
 }
@@ -72,5 +74,14 @@ impl From<winit::error::EventLoopError> for ScError {
         let caller_location = std::panic::Location::caller();
         log::error!("Building event loop error from failure at {caller_location}");
         ScError::EventLoop(value)
+    }
+}
+
+impl From<std::io::Error> for ScError {
+    #[track_caller]
+    fn from(value: std::io::Error) -> Self {
+        let caller_location = std::panic::Location::caller();
+        log::error!("Building io error from failure at {caller_location}");
+        ScError::Io(value)
     }
 }

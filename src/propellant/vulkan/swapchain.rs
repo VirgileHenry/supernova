@@ -1,8 +1,6 @@
 use ash::vk::Handle;
 
-
 const MAX_FRAMES_IN_FLIGHTS: usize = 2;
-
 
 pub struct Swapchain {
     pub swapchain_device: ash::khr::swapchain::Device,
@@ -10,12 +8,15 @@ pub struct Swapchain {
     format: ash::vk::Format,
     extent: ash::vk::Extent2D,
     images: Vec<SwapchainImage>,
-    synchronization: SwapchainSynchronization, 
+    synchronization: SwapchainSynchronization,
 }
 
-
 impl Swapchain {
-    pub fn create(vulkan_state: &crate::vulkan::VulkanState, device: &ash::Device, window: &winit::window::Window) -> Result<Swapchain, crate::ScError> {
+    pub fn create(
+        vulkan_state: &crate::propellant::vulkan::VulkanState,
+        device: &ash::Device,
+        window: &winit::window::Window,
+    ) -> Result<Swapchain, crate::ScError> {
         let indices = vulkan_state.queue_family_indices;
         let support = vulkan_state.current_swapchain_support()?;
 
@@ -42,9 +43,15 @@ impl Swapchain {
         let mut used_family_indices = std::collections::HashSet::with_capacity(4);
 
         used_family_indices.insert(indices.graphics.0);
-        if let Some((index, _)) = indices.present { used_family_indices.insert(index); }
-        if let Some((index, _)) = indices.transfer { used_family_indices.insert(index); }
-        if let Some((index, _)) = indices.compute { used_family_indices.insert(index); }
+        if let Some((index, _)) = indices.present {
+            used_family_indices.insert(index);
+        }
+        if let Some((index, _)) = indices.transfer {
+            used_family_indices.insert(index);
+        }
+        if let Some((index, _)) = indices.compute {
+            used_family_indices.insert(index);
+        }
 
         let used_family_indices = used_family_indices.into_iter().collect::<Vec<_>>();
 
@@ -58,7 +65,11 @@ impl Swapchain {
             image_usage: ash::vk::ImageUsageFlags::COLOR_ATTACHMENT,
             image_sharing_mode,
             queue_family_index_count: used_family_indices.len() as u32,
-            p_queue_family_indices: if used_family_indices.is_empty() { std::ptr::null() } else { used_family_indices.as_ptr() },
+            p_queue_family_indices: if used_family_indices.is_empty() {
+                std::ptr::null()
+            } else {
+                used_family_indices.as_ptr()
+            },
             pre_transform: support.capabilities.current_transform,
             composite_alpha: ash::vk::CompositeAlphaFlagsKHR::OPAQUE,
             present_mode,
@@ -71,13 +82,18 @@ impl Swapchain {
 
         let images = unsafe { swapchain_device.get_swapchain_images(swapchain)? };
 
-        let images = images.into_iter().map(|image| {
-            SwapchainImage::create(device, image, surface_format.format)
-        }).collect::<Result<Vec<_>, _>>()?;
+        let images = images
+            .into_iter()
+            .map(|image| SwapchainImage::create(device, image, surface_format.format))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let synchronization = SwapchainSynchronization::create(device, images.len())?;
 
-        log::info!("Successefuly created renderer swapchain, with {} images and {} max frames in flight", images.len(), MAX_FRAMES_IN_FLIGHTS);
+        log::info!(
+            "Successefuly created renderer swapchain, with {} images and {} max frames in flight",
+            images.len(),
+            MAX_FRAMES_IN_FLIGHTS
+        );
 
         Ok(Swapchain {
             swapchain,
@@ -89,21 +105,36 @@ impl Swapchain {
         })
     }
 
-    pub fn present(&self, image_index: usize, present_ready: ash::vk::Semaphore, present_queue: ash::vk::Queue) -> Result<bool, crate::ScError> {
+    pub fn present(
+        &self,
+        image_index: usize,
+        present_ready: ash::vk::Semaphore,
+        present_queue: ash::vk::Queue,
+    ) -> Result<bool, crate::ScError> {
         let swapchains = [self.swapchain];
         let image_indices = [image_index as u32];
         let wait_semaphores = [present_ready];
         let present_info = ash::vk::PresentInfoKHR {
             wait_semaphore_count: wait_semaphores.len() as u32,
-            p_wait_semaphores: if wait_semaphores.is_empty() { std::ptr::null() } else { wait_semaphores.as_ptr() },
+            p_wait_semaphores: if wait_semaphores.is_empty() {
+                std::ptr::null()
+            } else {
+                wait_semaphores.as_ptr()
+            },
             swapchain_count: swapchains.len() as u32,
-            p_swapchains: if swapchains.is_empty() { std::ptr::null() } else { swapchains.as_ptr() },
+            p_swapchains: if swapchains.is_empty() {
+                std::ptr::null()
+            } else {
+                swapchains.as_ptr()
+            },
             p_image_indices: image_indices.as_ptr(),
             ..Default::default()
         };
-        
+
         unsafe {
-            self.swapchain_device.queue_present(present_queue, &present_info).map_err(crate::ScError::from)
+            self.swapchain_device
+                .queue_present(present_queue, &present_info)
+                .map_err(crate::ScError::from)
         }
     }
 
@@ -129,32 +160,26 @@ impl Swapchain {
     pub fn go_to_next_frame(&mut self, device: &ash::Device) -> Result<(usize, InflightFrameSync), crate::ScError> {
         let sync = self.synchronization.next_sync();
         let image_index = unsafe {
-            self.swapchain_device.acquire_next_image(
-                self.swapchain,
-                u64::MAX,
-                sync.image_available,
-                ash::vk::Fence::null()
-            )?.0 as usize
+            self.swapchain_device
+                .acquire_next_image(self.swapchain, u64::MAX, sync.image_available, ash::vk::Fence::null())?
+                .0 as usize
         };
         if !self.synchronization.in_flight_images[image_index].is_null() {
-            unsafe { 
+            unsafe {
                 device.wait_for_fences(
                     &[self.synchronization.in_flight_images[image_index], sync.frame_finished],
                     true,
-                    u64::MAX
+                    u64::MAX,
                 )?;
             }
-        }
-        else {
-            unsafe { 
-                device.wait_for_fences(
-                    &[sync.frame_finished],
-                    true,
-                    u64::MAX
-                )?;
+        } else {
+            unsafe {
+                device.wait_for_fences(&[sync.frame_finished], true, u64::MAX)?;
             }
         }
-        unsafe { device.reset_fences(&[sync.frame_finished])?; }
+        unsafe {
+            device.reset_fences(&[sync.frame_finished])?;
+        }
         self.synchronization.in_flight_images[image_index] = sync.frame_finished;
         Ok((image_index, sync))
     }
@@ -169,24 +194,21 @@ impl Swapchain {
 
     fn get_swapchain_surface_format(formats: &[ash::vk::SurfaceFormatKHR]) -> ash::vk::SurfaceFormatKHR {
         // TODO: better way to get preferred format :)
-        formats.iter()
+        formats
+            .iter()
             .cloned()
-            .find(|f| {
-                f.format == ash::vk::Format::B8G8R8A8_SRGB
-                    && f.color_space == ash::vk::ColorSpaceKHR::SRGB_NONLINEAR
-            })
+            .find(|f| f.format == ash::vk::Format::B8G8R8A8_SRGB && f.color_space == ash::vk::ColorSpaceKHR::SRGB_NONLINEAR)
             .unwrap_or_else(|| formats[0]) // TODO: handle empty slice of formats (can it even happen ?)
     }
 
     fn get_swapchain_present_mode(present_modes: &[ash::vk::PresentModeKHR]) -> ash::vk::PresentModeKHR {
         // put the prefered present mode here, in order. First elements are the prefered ones.
-        const PREFERED_PRESENT_MODES: [ash::vk::PresentModeKHR; 2] = [
-            ash::vk::PresentModeKHR::MAILBOX,
-            ash::vk::PresentModeKHR::FIFO_RELAXED,
-        ];
+        const PREFERED_PRESENT_MODES: [ash::vk::PresentModeKHR; 2] =
+            [ash::vk::PresentModeKHR::MAILBOX, ash::vk::PresentModeKHR::FIFO_RELAXED];
         const GUARANTED_FALLBACK_MODE: ash::vk::PresentModeKHR = ash::vk::PresentModeKHR::FIFO;
-        
-        PREFERED_PRESENT_MODES.iter()
+
+        PREFERED_PRESENT_MODES
+            .iter()
             .cloned()
             .filter(|present_mode| present_modes.contains(&present_mode))
             .next()
@@ -198,19 +220,18 @@ impl Swapchain {
             capabilities.current_extent
         } else {
             ash::vk::Extent2D {
-                width: window.inner_size().width.clamp(
-                    capabilities.min_image_extent.width,
-                    capabilities.max_image_extent.width,
-                ),
-                height: window.inner_size().height.clamp(
-                    capabilities.min_image_extent.height,
-                    capabilities.max_image_extent.height,
-                ),
+                width: window
+                    .inner_size()
+                    .width
+                    .clamp(capabilities.min_image_extent.width, capabilities.max_image_extent.width),
+                height: window
+                    .inner_size()
+                    .height
+                    .clamp(capabilities.min_image_extent.height, capabilities.max_image_extent.height),
             }
         }
     }
 }
-
 
 impl Drop for Swapchain {
     fn drop(&mut self) {
@@ -218,7 +239,6 @@ impl Drop for Swapchain {
         // the vulkan interface of the renderer is responsible for cleaning up the swapchain.
     }
 }
-
 
 /// images of the swapchain, that will get displayed on the screen
 struct SwapchainImage {
@@ -252,10 +272,7 @@ impl SwapchainImage {
 
         let view = unsafe { device.create_image_view(&image_view_create_info, None)? };
 
-        Ok(SwapchainImage {
-            _image: image,
-            view,
-        })
+        Ok(SwapchainImage { _image: image, view })
     }
 
     fn destroy(&mut self, device: &ash::Device) {
@@ -264,7 +281,6 @@ impl SwapchainImage {
         }
     }
 }
-
 
 pub struct SwapchainSynchronization {
     current_frame: usize,
@@ -277,14 +293,15 @@ pub struct SwapchainSynchronization {
 
 impl SwapchainSynchronization {
     pub fn create(device: &ash::Device, swapchain_image_count: usize) -> Result<SwapchainSynchronization, crate::ScError> {
-
         let mut sync = [InflightFrameSync::null(); MAX_FRAMES_IN_FLIGHTS];
 
         for i in 0..MAX_FRAMES_IN_FLIGHTS {
             sync[i] = InflightFrameSync::create(device)?;
         }
 
-        let in_flight_images = std::iter::repeat(ash::vk::Fence::null()).take(swapchain_image_count).collect();
+        let in_flight_images = std::iter::repeat(ash::vk::Fence::null())
+            .take(swapchain_image_count)
+            .collect();
 
         Ok(SwapchainSynchronization {
             current_frame: 0,
@@ -304,7 +321,6 @@ impl SwapchainSynchronization {
     }
 }
 
-
 #[derive(Debug, Clone, Copy)]
 pub struct InflightFrameSync {
     pub image_available: ash::vk::Semaphore,
@@ -314,9 +330,7 @@ pub struct InflightFrameSync {
 
 impl InflightFrameSync {
     pub fn create(device: &ash::Device) -> Result<InflightFrameSync, crate::ScError> {
-        let semaphore_create_info = ash::vk::SemaphoreCreateInfo {
-            ..Default::default()
-        };
+        let semaphore_create_info = ash::vk::SemaphoreCreateInfo { ..Default::default() };
         let fence_create_info = ash::vk::FenceCreateInfo {
             flags: ash::vk::FenceCreateFlags::SIGNALED,
             ..Default::default()

@@ -1,17 +1,13 @@
+use crate::propellant::vulkan;
 
-use crate::vulkan::VkRendererInterface;
-
-
-
-pub mod geometry_pass;
 pub mod color_pass;
+pub mod geometry_pass;
 pub mod post_processing_pass;
-
 
 pub trait RenderingPass {
     type In;
     type Out;
-    fn render(&self, world: &hecs::World, vi: &VkRendererInterface, input: &Self::In, out: &mut Self::Out);
+    fn render(&self, world: &hecs::World, vi: &vulkan::VkRendererInterface, input: &Self::In, out: &mut Self::Out);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -24,18 +20,22 @@ impl RenderPassTarget {
         device: &ash::Device,
         render_pass: ash::vk::RenderPass,
         attachments: &[ash::vk::ImageView],
-        extent: ash::vk::Extent2D
+        extent: ash::vk::Extent2D,
     ) -> Result<RenderPassTarget, crate::ScError> {
         let framebuffer_create_info = ash::vk::FramebufferCreateInfo {
             render_pass,
             attachment_count: attachments.len() as u32,
-            p_attachments: if attachments.is_empty() { std::ptr::null() } else { attachments.as_ptr() },
+            p_attachments: if attachments.is_empty() {
+                std::ptr::null()
+            } else {
+                attachments.as_ptr()
+            },
             width: extent.width,
             height: extent.height,
             layers: 1, // TODO
             ..Default::default()
         };
-        
+
         let framebuffer = unsafe { device.create_framebuffer(&framebuffer_create_info, None)? };
 
         Ok(RenderPassTarget {
@@ -50,6 +50,3 @@ impl RenderPassTarget {
         }
     }
 }
-
-
-

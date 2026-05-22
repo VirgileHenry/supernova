@@ -2,6 +2,7 @@ pub trait System {
     fn name(&self) -> &'static str;
     fn frequency(&self) -> UpdateFrequency;
     fn update(&mut self, world: &mut hecs::World, delta_time: std::time::Duration);
+    fn handle_event(&mut self, event: SystemEvent);
 }
 
 pub enum UpdateFrequency {
@@ -65,4 +66,17 @@ impl SystemWrapper {
             }
         }
     }
+
+    pub fn handle_event(&mut self, event: SystemEvent) {
+        self.inner.handle_event(event);
+    }
+}
+
+/// Events that are sent to systems.
+#[derive(Clone)]
+pub enum SystemEvent<'a> {
+    SwapchainRecreationRequest {
+        vulkan_state: &'a crate::propellant::VulkanState,
+        window: &'a winit::window::Window,
+    },
 }

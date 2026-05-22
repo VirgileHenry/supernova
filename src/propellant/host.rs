@@ -24,18 +24,18 @@ impl<App: crate::propellant::Application> winit::application::ApplicationHandler
     for EngineHost<App>
 {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        /* Initialize the application */
         match self.application_data.as_ref() {
             None => {
+                /* Initialize the application */
                 if let Err(e) = self.init(event_loop) {
                     log::error!("Failed to init resources: {e}");
                     event_loop.exit();
                 }
+                /* Set event loop to poll */
+                event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
             }
             Some(_) => log::warn!("Received resume event with all resources already created."),
         }
-        /* Set event loop to poll */
-        event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     }
 
     fn window_event(

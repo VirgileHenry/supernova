@@ -1,11 +1,8 @@
-pub mod construct;
-pub mod consts;
-pub mod csg;
-pub mod error;
+mod constants;
+mod csg;
+mod error;
 mod propellant;
 mod supernova;
-pub mod types;
-pub mod vulkan;
 
 pub use error::ScError;
 

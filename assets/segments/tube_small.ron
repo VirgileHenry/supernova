@@ -1,0 +1,15 @@
+#![enable(unwrap_variant_newtypes)]
+(
+    name: "Tube Small",
+    shell: Cylinder(
+        a: Vec3(1.0, 0.0, 0.0),
+        b: Vec3(-1.0, 0.0, 0.0),
+        radius: 1.0,
+    ),
+    interior: Cylinder(
+        a: Vec3(0.95, 0.0, 0.0),
+        b: Vec3(-0.95, 0.0, 0.0),
+        radius: 0.8,
+    ),
+    cosmetics: Empty,
+)

@@ -1,6 +1,7 @@
 mod system;
 
 pub use system::System;
+pub use system::SystemEvent;
 pub use system::UpdateFrequency;
 
 /// A Scene is the main container for an ECS and multiple systems.
@@ -26,7 +27,7 @@ impl Scene {
 
     /// Create the Scene used as the main menu.
     pub fn main_menu(
-        vulkan_state: &crate::vulkan::VulkanState,
+        vulkan_state: &crate::propellant::vulkan::VulkanState,
         window: &winit::window::Window,
         event_loop_proxy: crate::propellant::EventLoopProxy,
     ) -> Result<Self, crate::ScError> {
@@ -49,6 +50,12 @@ impl Scene {
             world,
             systems,
         })
+    }
+
+    pub fn send_system_event(&mut self, event: SystemEvent) {
+        for system in self.systems.iter_mut() {
+            system.handle_event(event.clone())
+        }
     }
 
     pub fn load_system<S: system::System + 'static>(&mut self, system: S) {

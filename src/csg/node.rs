@@ -1,9 +1,9 @@
 use super::{BinOp, Primitive, UnaryOp};
 
-
 /// A single node in a CSG tree.
 /// The node does not have chlidren, at is it stored in a vec with a prefix notation.
 #[derive(Debug, Clone, Copy)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum CsgNode {
     Primitive(Primitive),
     UnaryOp(UnaryOp),

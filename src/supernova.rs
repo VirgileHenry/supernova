@@ -2,7 +2,9 @@
 
 pub struct SupernovaApp {
     window: winit::window::Window,
-    vulkan_state: crate::vulkan::VulkanState,
+    vulkan_state: crate::propellant::VulkanState, /* Fixme: in engine, not here ? */
+
+    assets: crate::propellant::AssetManager,
 
     /* Fixme: better scene management */
     scene: crate::propellant::Scene,
@@ -19,13 +21,14 @@ impl crate::propellant::Application for SupernovaApp {
 
         // very first thing is creating the window!
         // we can use the window to quickly loadup a loading / presentation screen using a very simple API like softbuffer
-        let window = event_loop.create_window(winit::window::WindowAttributes::default())?;
+        let window_attributes = winit::window::WindowAttributes::default().with_title(crate::constants::SUPERNOVA_NAME);
+        let window = event_loop.create_window(window_attributes)?;
 
         // let mut loading_screen = loading_screen::LoadingScreen::new(&window)?;
         // this will directly display an image and present it to the window, opening it up.
         // loading_screen.display_image();
 
-        let vulkan_state = crate::vulkan::VulkanState::create(&window)?;
+        let vulkan_state = crate::propellant::VulkanState::create(&window)?;
 
         // loading screen is no longer required, as main resources are created and we can proceed with main loop and let the engine manage
         // drop(loading_screen);
@@ -34,11 +37,15 @@ impl crate::propellant::Application for SupernovaApp {
         // Fixme: that's not the main menu, need loading scene to load the game up
         let scene = crate::propellant::Scene::main_menu(&vulkan_state, &window, proxy.clone())?;
 
+        /* Load the assets up */
+        let assets = crate::propellant::AssetManager::load("assets")?;
+
         Ok(Self {
             window,
             vulkan_state,
             scene,
             last_update: std::time::Instant::now(),
+            assets,
         })
     }
 
@@ -59,11 +66,19 @@ impl crate::propellant::Application for SupernovaApp {
         match event {
             winit::event::WindowEvent::CloseRequested => event_loop.exit(),
             winit::event::WindowEvent::RedrawRequested => self.tick(),
-            other => log::warn!("Unhandled window event: {other:?} for window {window_id:?}"),
+            other => log::debug!("Unhandled window event: {other:?} for window {window_id:?}"),
         }
     }
 
-    fn handle_engine_event(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, event: crate::propellant::EngineEvent) {
-        log::warn!("Unhandled engine event: {event:?}");
+    fn handle_engine_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: crate::propellant::EngineEvent) {
+        match event {
+            crate::propellant::EngineEvent::SwapchainRecreationRequest => {
+                let event = crate::propellant::SystemEvent::SwapchainRecreationRequest {
+                    vulkan_state: &self.vulkan_state,
+                    window: &self.window,
+                };
+                self.scene.send_system_event(event)
+            }
+        }
     }
 }
