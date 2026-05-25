@@ -6,22 +6,29 @@ pub struct GeometryPassInput {
     pub render_area: ash::vk::Rect2D,
 }
 
-pub struct GeometryPassOutput {
-    pub target: super::RenderPassTarget,
+pub struct GeometryPassOutput<'output> {
+    pub target: &'output super::RenderPassTarget,
 }
 
 /// For now, the only render pass that renders super simple geometry to test architecture
 pub struct GeometryPass {
+    vk_device: vulkan::VkDeviceHandle,
     pipeline_layout: ash::vk::PipelineLayout,
     pipeline: ash::vk::Pipeline,
     render_pass: ash::vk::RenderPass,
 }
 
 impl super::RenderingPass for GeometryPass {
-    type In = GeometryPassInput;
-    type Out = GeometryPassOutput;
+    type Input<'input> = GeometryPassInput;
+    type Output<'output> = GeometryPassOutput<'output>;
 
-    fn render(&self, _world: &hecs::World, vi: &vulkan::VkRendererInterface, input: &Self::In, out: &mut Self::Out) {
+    fn render<'input, 'output>(
+        &self,
+        world: &hecs::World,
+        vk_device: &vulkan::VkDeviceHandle,
+        input: &Self::Input<'input>,
+        out: &mut Self::Output<'output>,
+    ) {
         // temp rendering code here!
 
         let clear_color = ash::vk::ClearValue {
@@ -46,21 +53,18 @@ impl super::RenderingPass for GeometryPass {
         };
 
         unsafe {
-            vi.cmd_begin_render_pass(*input.command_buffer, &render_pass_begin, ash::vk::SubpassContents::INLINE);
-            vi.cmd_bind_pipeline(*input.command_buffer, ash::vk::PipelineBindPoint::GRAPHICS, self.pipeline);
-            vi.cmd_draw(*input.command_buffer, 3, 1, 0, 0);
-            vi.cmd_end_render_pass(*input.command_buffer);
+            vk_device.cmd_begin_render_pass(*input.command_buffer, &render_pass_begin, ash::vk::SubpassContents::INLINE);
+            vk_device.cmd_bind_pipeline(*input.command_buffer, ash::vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+            vk_device.cmd_draw(*input.command_buffer, 3, 1, 0, 0);
+            vk_device.cmd_end_render_pass(*input.command_buffer);
         };
     }
 }
 
 impl GeometryPass {
-    pub fn create(
-        vulkan_interface: &vulkan::VkRendererInterface,
-        swapchain: &vulkan::Swapchain,
-    ) -> Result<GeometryPass, crate::ScError> {
-        let vertex_shader = vulkan_interface.load_shader(shaders::EXAMPLE_VERT.code)?;
-        let fragment_shader = vulkan_interface.load_shader(shaders::EXAMPLE_FRAG.code)?;
+    pub fn create(vk_device: &vulkan::VkDeviceHandle, swapchain: &vulkan::VkSwapchain) -> Result<GeometryPass, crate::ScError> {
+        let vertex_shader = vk_device.load_shader_module(shaders::EXAMPLE_VERT.code)?;
+        let fragment_shader = vk_device.load_shader_module(shaders::EXAMPLE_FRAG.code)?;
 
         let vert_stage = ash::vk::PipelineShaderStageCreateInfo {
             stage: ash::vk::ShaderStageFlags::VERTEX,
@@ -149,9 +153,9 @@ impl GeometryPass {
 
         let layout_info = ash::vk::PipelineLayoutCreateInfo { ..Default::default() };
 
-        let render_pass = Self::create_render_pass(vulkan_interface, swapchain)?;
+        let render_pass = Self::create_render_pass(vk_device, swapchain)?;
 
-        let pipeline_layout = unsafe { vulkan_interface.create_pipeline_layout(&layout_info, None)? };
+        let pipeline_layout = unsafe { vk_device.create_pipeline_layout(&layout_info, None)? };
 
         let stages = [vert_stage, frag_stage];
 
@@ -174,18 +178,19 @@ impl GeometryPass {
             ..Default::default()
         }];
 
-        let pipeline = unsafe { vulkan_interface.create_graphics_pipelines(ash::vk::PipelineCache::null(), &create_infos, None) }
+        let pipeline = unsafe { vk_device.create_graphics_pipelines(ash::vk::PipelineCache::null(), &create_infos, None) }
             .map_err(|(_, e)| e)?
             .remove(0);
 
         log::info!("Successefuly created geometry render pass");
 
         unsafe {
-            vulkan_interface.destroy_shader_module(vertex_shader, None);
-            vulkan_interface.destroy_shader_module(fragment_shader, None);
+            vk_device.destroy_shader_module(vertex_shader, None);
+            vk_device.destroy_shader_module(fragment_shader, None);
         }
 
         Ok(GeometryPass {
+            vk_device: vk_device.clone(),
             pipeline_layout,
             pipeline,
             render_pass,
@@ -196,17 +201,9 @@ impl GeometryPass {
         self.render_pass
     }
 
-    pub fn destroy(&self, vulkan_interface: &vulkan::VkRendererInterface) {
-        unsafe {
-            vulkan_interface.destroy_pipeline(self.pipeline, None);
-            vulkan_interface.destroy_pipeline_layout(self.pipeline_layout, None);
-            vulkan_interface.destroy_render_pass(self.render_pass, None);
-        }
-    }
-
     fn create_render_pass(
-        vulkan_interface: &vulkan::VkRendererInterface,
-        swapchain: &vulkan::Swapchain,
+        vk_device: &vulkan::VkDeviceHandle,
+        swapchain: &vulkan::VkSwapchain,
     ) -> Result<ash::vk::RenderPass, crate::ScError> {
         let color_attachment = ash::vk::AttachmentDescription {
             format: swapchain.format(),
@@ -274,6 +271,16 @@ impl GeometryPass {
             ..Default::default()
         };
 
-        Ok(unsafe { vulkan_interface.create_render_pass(&create_info, None)? })
+        Ok(unsafe { vk_device.create_render_pass(&create_info, None)? })
+    }
+}
+
+impl Drop for GeometryPass {
+    fn drop(&mut self) {
+        unsafe {
+            self.vk_device.destroy_pipeline(self.pipeline, None);
+            self.vk_device.destroy_pipeline_layout(self.pipeline_layout, None);
+            self.vk_device.destroy_render_pass(self.render_pass, None);
+        }
     }
 }

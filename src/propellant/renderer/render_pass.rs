@@ -5,19 +5,28 @@ pub mod geometry_pass;
 pub mod post_processing_pass;
 
 pub trait RenderingPass {
-    type In;
-    type Out;
-    fn render(&self, world: &hecs::World, vi: &vulkan::VkRendererInterface, input: &Self::In, out: &mut Self::Out);
+    type Input<'input>;
+    type Output<'output>;
+    fn render<'input, 'output>(
+        &self,
+        world: &hecs::World,
+        vk_device: &vulkan::VkDeviceHandle,
+        input: &Self::Input<'input>,
+        out: &mut Self::Output<'output>,
+    );
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct RenderPassTarget {
+    /// Handle to the vulkan device to use the vulkan API.
+    vk_device: vulkan::VkDeviceHandle,
+    /// Target framebuffer to write to.
     pub framebuffer: ash::vk::Framebuffer,
 }
 
 impl RenderPassTarget {
     pub fn create(
-        device: &ash::Device,
+        vk_device: &crate::propellant::vulkan::VkDeviceHandle,
         render_pass: ash::vk::RenderPass,
         attachments: &[ash::vk::ImageView],
         extent: ash::vk::Extent2D,
@@ -36,17 +45,17 @@ impl RenderPassTarget {
             ..Default::default()
         };
 
-        let framebuffer = unsafe { device.create_framebuffer(&framebuffer_create_info, None)? };
+        let framebuffer = unsafe { vk_device.create_framebuffer(&framebuffer_create_info, None)? };
 
         Ok(RenderPassTarget {
+            vk_device: vk_device.clone(),
             framebuffer,
-            // semaphore,
         })
     }
+}
 
-    pub fn destroy(&mut self, device: &ash::Device) {
-        unsafe {
-            device.destroy_framebuffer(self.framebuffer, None);
-        }
+impl Drop for RenderPassTarget {
+    fn drop(&mut self) {
+        unsafe { self.vk_device.destroy_framebuffer(self.framebuffer, None) }
     }
 }

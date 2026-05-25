@@ -1,14 +1,15 @@
 //! Supernova is the actual game running on the propellant engine.
 
 pub struct SupernovaApp {
-    window: winit::window::Window,
-    vulkan_state: crate::propellant::VulkanState, /* Fixme: in engine, not here ? */
-
-    assets: crate::propellant::AssetManager,
-
     /* Fixme: better scene management */
     scene: crate::propellant::Scene,
     last_update: std::time::Instant,
+
+    assets: crate::propellant::AssetManager,
+
+    vk_device: std::sync::Arc<crate::propellant::VkDevice>,
+    vk_instance: crate::propellant::VkInstance, /* Fixme: in engine, not here ? */
+    window: winit::window::Window,
 }
 
 impl crate::propellant::Application for SupernovaApp {
@@ -28,21 +29,26 @@ impl crate::propellant::Application for SupernovaApp {
         // this will directly display an image and present it to the window, opening it up.
         // loading_screen.display_image();
 
-        let vulkan_state = crate::propellant::VulkanState::create(&window)?;
+        let vk_instance = crate::propellant::VkInstance::create(&window)?;
+        let prefered_physical_device = vk_instance
+            .prefered_physical_device()
+            .ok_or_else(|| crate::ScError::Generic("Unable to create a Vulkan device: no suitable physical devices!"))?;
+        let vk_device = crate::propellant::VkDevice::create(&vk_instance, prefered_physical_device.clone())?;
 
         // loading screen is no longer required, as main resources are created and we can proceed with main loop and let the engine manage
         // drop(loading_screen);
 
         // load start scene
         // Fixme: that's not the main menu, need loading scene to load the game up
-        let scene = crate::propellant::Scene::main_menu(&vulkan_state, &window, proxy.clone())?;
+        let scene = crate::propellant::Scene::main_menu(&vk_instance, vk_device.clone(), &window, proxy.clone())?;
 
         /* Load the assets up */
         let assets = crate::propellant::AssetManager::load("assets")?;
 
         Ok(Self {
             window,
-            vulkan_state,
+            vk_instance,
+            vk_device,
             scene,
             last_update: std::time::Instant::now(),
             assets,
@@ -66,6 +72,13 @@ impl crate::propellant::Application for SupernovaApp {
         match event {
             winit::event::WindowEvent::CloseRequested => event_loop.exit(),
             winit::event::WindowEvent::RedrawRequested => self.tick(),
+            winit::event::WindowEvent::Resized(_) => {
+                let event = crate::propellant::SystemEvent::SwapchainRecreationRequest {
+                    vulkan_state: &self.vk_instance,
+                    window: &self.window,
+                };
+                self.scene.send_system_event(event)
+            }
             other => log::debug!("Unhandled window event: {other:?} for window {window_id:?}"),
         }
     }
@@ -74,7 +87,7 @@ impl crate::propellant::Application for SupernovaApp {
         match event {
             crate::propellant::EngineEvent::SwapchainRecreationRequest => {
                 let event = crate::propellant::SystemEvent::SwapchainRecreationRequest {
-                    vulkan_state: &self.vulkan_state,
+                    vulkan_state: &self.vk_instance,
                     window: &self.window,
                 };
                 self.scene.send_system_event(event)

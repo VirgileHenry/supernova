@@ -17,9 +17,9 @@ pub struct Scene {
 impl Scene {
     /// Create a new, fully empty Scene.
     /// This is usefull if we want a placeholder, inactive value.
-    pub fn empty() -> Self {
+    fn empty(name: String) -> Self {
         Self {
-            name: "Empty Scene".to_string(),
+            name,
             world: hecs::World::new(),
             systems: system::SystemMap::new(),
         }
@@ -27,29 +27,25 @@ impl Scene {
 
     /// Create the Scene used as the main menu.
     pub fn main_menu(
-        vulkan_state: &crate::propellant::vulkan::VulkanState,
+        vk_context: &crate::propellant::VkInstance,
+        vk_device: crate::propellant::vulkan::VkDeviceHandle,
         window: &winit::window::Window,
         event_loop_proxy: crate::propellant::EventLoopProxy,
     ) -> Result<Self, crate::ScError> {
         log::info!("Creating menu Scene");
-
-        let world = hecs::World::new();
-        let mut systems = system::SystemMap::new();
+        let mut scene = Self::empty("Main Menu".to_string());
 
         /* Standard systems for the menu world */
-        systems.add(crate::propellant::renderer::Renderer::create(
-            vulkan_state,
+        scene.load_system(crate::propellant::renderer::Renderer::create(
+            vk_context,
+            vk_device,
             window,
             event_loop_proxy,
         )?);
 
         // Insert all objects for menu world
 
-        Ok(Scene {
-            name: "Main Menu".to_string(),
-            world,
-            systems,
-        })
+        Ok(scene)
     }
 
     pub fn send_system_event(&mut self, event: SystemEvent) {
@@ -59,7 +55,7 @@ impl Scene {
     }
 
     pub fn load_system<S: system::System + 'static>(&mut self, system: S) {
-        log::info!("Loaded system {} into Scene.", system.name());
+        log::info!("Loading system \"{}\" into scene \"{}\".", system.name(), self.name);
         self.systems.add(system);
     }
 

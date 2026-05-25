@@ -1,255 +1,314 @@
-/// Required features to use the physical device.
-/// If at any point we need a feature, set it to 1 in this list.
-const REQUIRED_DEVICE_FEATURES: ash::vk::PhysicalDeviceFeatures = ash::vk::PhysicalDeviceFeatures {
-    robust_buffer_access: ash::vk::FALSE,
-    full_draw_index_uint32: ash::vk::FALSE,
-    image_cube_array: ash::vk::FALSE,
-    independent_blend: ash::vk::FALSE,
-    geometry_shader: ash::vk::FALSE,
-    tessellation_shader: ash::vk::FALSE,
-    sample_rate_shading: ash::vk::FALSE,
-    dual_src_blend: ash::vk::FALSE,
-    logic_op: ash::vk::FALSE,
-    multi_draw_indirect: ash::vk::FALSE,
-    draw_indirect_first_instance: ash::vk::FALSE,
-    depth_clamp: ash::vk::FALSE,
-    depth_bias_clamp: ash::vk::FALSE,
-    fill_mode_non_solid: ash::vk::FALSE,
-    depth_bounds: ash::vk::FALSE,
-    wide_lines: ash::vk::FALSE,
-    large_points: ash::vk::FALSE,
-    alpha_to_one: ash::vk::FALSE,
-    multi_viewport: ash::vk::FALSE,
-    sampler_anisotropy: ash::vk::FALSE,
-    texture_compression_etc2: ash::vk::FALSE,
-    texture_compression_astc_ldr: ash::vk::FALSE,
-    texture_compression_bc: ash::vk::FALSE,
-    occlusion_query_precise: ash::vk::FALSE,
-    pipeline_statistics_query: ash::vk::FALSE,
-    vertex_pipeline_stores_and_atomics: ash::vk::FALSE,
-    fragment_stores_and_atomics: ash::vk::FALSE,
-    shader_tessellation_and_geometry_point_size: ash::vk::FALSE,
-    shader_image_gather_extended: ash::vk::FALSE,
-    shader_storage_image_extended_formats: ash::vk::FALSE,
-    shader_storage_image_multisample: ash::vk::FALSE,
-    shader_storage_image_read_without_format: ash::vk::FALSE,
-    shader_storage_image_write_without_format: ash::vk::FALSE,
-    shader_uniform_buffer_array_dynamic_indexing: ash::vk::FALSE,
-    shader_sampled_image_array_dynamic_indexing: ash::vk::FALSE,
-    shader_storage_buffer_array_dynamic_indexing: ash::vk::FALSE,
-    shader_storage_image_array_dynamic_indexing: ash::vk::FALSE,
-    shader_clip_distance: ash::vk::FALSE,
-    shader_cull_distance: ash::vk::FALSE,
-    shader_float64: ash::vk::FALSE,
-    shader_int64: ash::vk::FALSE,
-    shader_int16: ash::vk::FALSE,
-    shader_resource_residency: ash::vk::FALSE,
-    shader_resource_min_lod: ash::vk::FALSE,
-    sparse_binding: ash::vk::FALSE,
-    sparse_residency_buffer: ash::vk::FALSE,
-    sparse_residency_image2_d: ash::vk::FALSE,
-    sparse_residency_image3_d: ash::vk::FALSE,
-    sparse_residency2_samples: ash::vk::FALSE,
-    sparse_residency4_samples: ash::vk::FALSE,
-    sparse_residency8_samples: ash::vk::FALSE,
-    sparse_residency16_samples: ash::vk::FALSE,
-    sparse_residency_aliased: ash::vk::FALSE,
-    variable_multisample_rate: ash::vk::FALSE,
-    inherited_queries: ash::vk::FALSE,
-};
+mod requirements;
+mod surface_support;
 
-/// Required extensions by the logical device (hence, should be present on the physical device)
-/// This shall match the renderer::vulkan_interface::REQUIRED_DEVICE_EXTENSIONS
-const REQUIRED_DEVICE_EXTENSIONS: &[crate::propellant::vulkan::utils::VulkanName] = &[
-    crate::propellant::vulkan::utils::VulkanName::new("VK_KHR_swapchain"),
-    crate::propellant::vulkan::utils::VulkanName::new("VK_EXT_descriptor_indexing"),
-];
+pub use requirements::required_device_extensions;
+pub use requirements::required_device_features;
+pub use surface_support::SurfaceSupport;
 
-pub fn valid_physical_devices<'a>(
-    instance: &'a ash::Instance,
-    surface_instance: &'a ash::khr::surface::Instance,
-    surface: ash::vk::SurfaceKHR,
-) -> Option<impl Iterator<Item = ash::vk::PhysicalDevice> + 'a> {
-    Some(
-        unsafe { instance.enumerate_physical_devices() }
-            .ok()?
-            .into_iter()
-            .filter(move |physical_device| validate_physical_device(instance, surface_instance, *physical_device, surface)),
-    )
+use crate::propellant::vulkan;
+
+/// Cached info about a vulkan physical device.
+///
+/// These are meant to be fetched once at application startup,
+/// then stored and queried if required.
+///
+/// If this device is constructed, it meets all the minimum requirements and can be used.
+///
+/// These informations are true for a given `(instance, surface)` pair.
+/// If the surface ever gets invalidated, we need to throw these info and rebuild them.
+#[derive(Clone)]
+pub struct VkPhysicalDevice {
+    /// Display name of the physical device.
+    name: String,
+    /// Display name of the driver.
+    driver: String,
+
+    /// The raw handle of the physical device.
+    /// This is queried from the vulkan instance.
+    handle: ash::vk::PhysicalDevice,
+
+    /// Cached properties of the physical device.
+    properties: ash::vk::PhysicalDeviceProperties,
+    /// Cached properties for 1.2 of the physical device.
+    properties_1_2: ash::vk::PhysicalDeviceVulkan12Properties<'static>, /* Fixme: remove the static, own the data ? that means copying the structs  */
+    /// Cached properties for 1.3 of the physical device.
+    properties_1_3: ash::vk::PhysicalDeviceVulkan13Properties<'static>, /* Fixme: remove the static, own the data ? that means copying the structs  */
+
+    /// Cached memory properties of the physical device.
+    memory_properties: ash::vk::PhysicalDeviceMemoryProperties,
+
+    /// Cached standard features of the physical device.
+    features: ash::vk::PhysicalDeviceFeatures,
+    /// Cached features for 1.2 of the physical device.
+    features_1_2: ash::vk::PhysicalDeviceVulkan12Features<'static>, /* Fixme: remove the static, own the data ? that means copying the structs  */
+    /// Cached features for 1.3 of the physical device.
+    features_1_3: ash::vk::PhysicalDeviceVulkan13Features<'static>, /* Fixme: remove the static, own the data ? that means copying the structs  */
+
+    /// Available queue families on this device.
+    /// Indexed by queue family index.
+    queue_families: Vec<ash::vk::QueueFamilyProperties>,
+
+    /// Extensions supported by the physical device.
+    supported_extensions: std::collections::BTreeSet<String>,
+
+    /// Surface-dependent capabilities for OUR surface.
+    surface_support: SurfaceSupport,
+
+    /// Pre-computed queue family assignments based on our needs.
+    queue_family_indices: vulkan::QueueFamilyIndices,
 }
 
-pub fn best_physical_device(
+impl VkPhysicalDevice {
+    pub fn handle(&self) -> ash::vk::PhysicalDevice {
+        self.handle
+    }
+
+    pub fn queue_family_indices(&self) -> vulkan::QueueFamilyIndices {
+        self.queue_family_indices
+    }
+
+    pub fn surface_support(&self) -> &SurfaceSupport {
+        &self.surface_support
+    }
+}
+
+impl std::fmt::Debug for VkPhysicalDevice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {} ({:?})", self.name, self.driver, self.handle)
+    }
+}
+
+impl std::fmt::Display for VkPhysicalDevice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {}", self.name, self.driver)
+    }
+}
+
+/// Cached info about a vulkan physical device.
+///
+/// This version is for physical devices that does not
+/// meet the minimum requirements to be used by the engine.
+///
+/// The struct acts as a placeholder with the minimum informations
+/// so we still know that the device exists.
+pub struct VkUnusablePhysicalDevice {
+    /// Display name of the physical device.
+    name: String,
+    /// Display name of the driver.
+    driver: String,
+
+    /// The raw handle of the physical device.
+    /// This is queried from the vulkan instance.
+    handle: ash::vk::PhysicalDevice,
+
+    /// Reason on to why the physical device can't be used.
+    reason: String,
+}
+
+impl std::fmt::Debug for VkUnusablePhysicalDevice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {} ({:?})", self.name, self.driver, self.handle)
+    }
+}
+
+impl std::fmt::Display for VkUnusablePhysicalDevice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {}", self.name, self.driver)
+    }
+}
+
+/// All available physical devices.
+///
+/// This structure split physical devices into two categories:
+/// - `usable_physical_devices` that met the required criterion to be used for the engine
+/// - `unusable_physical_devices` that did not met those criterion, and can't be used.
+pub struct VkPhysicalDevices {
+    /// List of all usable physical devices.
+    usable_physical_devices: Vec<std::sync::Arc<VkPhysicalDevice>>,
+    /// List of all unusable physical devices.
+    unusable_physical_devices: Vec<std::sync::Arc<VkUnusablePhysicalDevice>>,
+}
+
+impl VkPhysicalDevices {
+    pub fn usable_physical_devices(&self) -> &[std::sync::Arc<VkPhysicalDevice>] {
+        self.usable_physical_devices.as_slice()
+    }
+
+    pub fn unusable_physical_devices(&self) -> &[std::sync::Arc<VkUnusablePhysicalDevice>] {
+        self.unusable_physical_devices.as_slice()
+    }
+
+    pub fn log_all(&self) {
+        log::info!("List of all available physical devices:");
+        if !self.usable_physical_devices().is_empty() {
+            log::info!("Usable physical devices:");
+        }
+        for device in self.usable_physical_devices().iter() {
+            log::info!(" - {device}");
+        }
+        if !self.unusable_physical_devices().is_empty() {
+            log::info!("Unusable physical devices:");
+        }
+        for device in self.unusable_physical_devices().iter() {
+            log::info!(" - {device} Unusubale: {}", device.reason);
+        }
+    }
+}
+
+pub fn query_physical_devices(
     instance: &ash::Instance,
+    surface: ash::vk::SurfaceKHR,
     surface_instance: &ash::khr::surface::Instance,
-    surface: ash::vk::SurfaceKHR,
-) -> Option<(ash::vk::PhysicalDevice, super::queue_family_indices::QueueFamilyIndices)> {
-    valid_physical_devices(instance, surface_instance, surface)?
-        .map(|device| {
-            let queue_family_indices =
-                super::queue_family_indices::QueueFamilyIndices::get(instance, surface_instance, device, surface);
-            (device, queue_family_indices)
-        })
-        .filter(|(_, queue_family_indices)| queue_family_indices.is_ok())
-        .map(|(device, queue_family_indices)| (device, queue_family_indices.unwrap()))
-        .max_by(|(dev1, qfi1), (dev2, qfi2)| score_physical_device(*dev1, *qfi1).cmp(&score_physical_device(*dev2, *qfi2)))
-}
+) -> ash::prelude::VkResult<VkPhysicalDevices> {
+    let physical_devices = unsafe { instance.enumerate_physical_devices() }?;
 
-/// Attempts to score the physical devices to pick the best one.
-/// This function shall take in more parameters and be improved.
-fn score_physical_device(
-    _physical_device: ash::vk::PhysicalDevice,
-    queue_family_indices: super::queue_family_indices::QueueFamilyIndices,
-) -> i32 {
-    let mut score = 0;
+    let mut usable_physical_devices = Vec::with_capacity(physical_devices.len());
+    let mut unusable_physical_devices = Vec::with_capacity(physical_devices.len());
 
-    if queue_family_indices.transfer.is_some() {
-        score += 1; // nicer to have separate transfer queue
-    }
-    if queue_family_indices.compute.is_some() {
-        score += 1; // nicer to have dedicated compute queue
+    for physical_device in physical_devices.into_iter() {
+        match check_physical_device_capabilities(instance, surface, surface_instance, physical_device)? {
+            DeviceClassification::Usable(physical_device) => {
+                let physical_device = std::sync::Arc::new(physical_device);
+                usable_physical_devices.push(physical_device)
+            }
+            DeviceClassification::Unusable(physical_device) => {
+                let physical_device = std::sync::Arc::new(physical_device);
+                unusable_physical_devices.push(physical_device)
+            }
+        }
     }
 
-    score
+    Ok(VkPhysicalDevices {
+        usable_physical_devices,
+        unusable_physical_devices,
+    })
 }
 
-/// Tells whether a physical device meets the mininmum requirements to be used in our app.
-/// The requirements can be features, extensions, properties, etc.
-fn validate_physical_device(
+fn check_physical_device_capabilities(
     instance: &ash::Instance,
+    surface: ash::vk::SurfaceKHR,
     surface_instance: &ash::khr::surface::Instance,
     physical_device: ash::vk::PhysicalDevice,
-    surface: ash::vk::SurfaceKHR,
-) -> bool {
-    // physical device should have at least one queue that can perform present ops
-    let at_least_one_queue_can_present = unsafe { instance.get_physical_device_queue_family_properties(physical_device) }
-        .iter()
-        .enumerate()
-        .map(|(queue_family_index, _)| unsafe {
-            surface_instance.get_physical_device_surface_support(physical_device, queue_family_index as u32, surface)
-        })
-        .any(|res| res == Ok(true));
-    // check for physical device features
-    let physical_device_contains_all_features =
-        physical_device_contains_all_features(unsafe { instance.get_physical_device_features(physical_device) });
-    // TODO: also check there is enough queues for everything ? so if compute queue is none, we can fallback on graphics queue but can it also do compute ?
+) -> ash::prelude::VkResult<DeviceClassification> {
+    use vulkan::utils::vulkan_name_to_string;
+    use vulkan::QueueFamilyIndices;
 
-    // check for physical device extensions
-    let check_physical_device_extensions = match check_physical_device_extensions(instance, physical_device) {
-        Ok(res) => res,
-        Err(e) => {
-            log::warn!("Failed to check extensions for physical device {physical_device:?}: {e}, default to false");
-            false
+    /* Get all required properties to check */
+
+    /* Use the p_next pointer chain to get 1.2 & 1.3 properties */
+    let mut properties_1_3 = ash::vk::PhysicalDeviceVulkan13Properties::default();
+    let mut properties_1_2 = ash::vk::PhysicalDeviceVulkan12Properties::default();
+    let mut properties = ash::vk::PhysicalDeviceProperties2::default()
+        .push_next(&mut properties_1_3)
+        .push_next(&mut properties_1_2);
+    unsafe { instance.get_physical_device_properties2(physical_device, &mut properties) };
+    let properties = properties.properties;
+
+    /* Straight forward for memory properties, no extensions to build */
+    let mut memory_properties = ash::vk::PhysicalDeviceMemoryProperties2::default();
+    unsafe { instance.get_physical_device_memory_properties2(physical_device, &mut memory_properties) };
+    let memory_properties = memory_properties.memory_properties;
+
+    /* Use the p_next pointer chain to get 1.2 & 1.3 features */
+    let mut features_1_3 = ash::vk::PhysicalDeviceVulkan13Features::default();
+    let mut features_1_2 = ash::vk::PhysicalDeviceVulkan12Features::default();
+    let mut features = ash::vk::PhysicalDeviceFeatures2::default()
+        .push_next(&mut features_1_3)
+        .push_next(&mut features_1_2);
+    unsafe { instance.get_physical_device_features2(physical_device, &mut features) };
+    let features = features.features;
+
+    let queue_families = unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
+
+    let extensions = unsafe { instance.enumerate_device_extension_properties(physical_device) }?;
+    let supported_extensions = extensions
+        .into_iter()
+        .map(|ext| vulkan_name_to_string(ext.extension_name.as_slice()))
+        .collect::<std::collections::BTreeSet<_>>();
+
+    let surface_support = SurfaceSupport::get(surface, surface_instance, physical_device)?;
+
+    /* Build the names from the vulkan c strings */
+    let name = vulkan_name_to_string(properties.device_name.as_slice());
+    let driver = vulkan_name_to_string(properties_1_2.driver_name.as_slice());
+
+    if properties.api_version < vulkan::VULKAN_API_VERSION {
+        return Ok(DeviceClassification::Unusable(VkUnusablePhysicalDevice {
+            name,
+            driver,
+            handle: physical_device,
+            reason: format!(
+                "Invalid API version: required {}, found {}",
+                vulkan::utils::format_api_version(vulkan::VULKAN_API_VERSION),
+                vulkan::utils::format_api_version(properties.api_version),
+            ),
+        }));
+    }
+
+    let queue_family_indices = match QueueFamilyIndices::get(instance, surface_instance, surface, physical_device)? {
+        Some(queue_family) => queue_family,
+        None => {
+            return Ok(DeviceClassification::Unusable(VkUnusablePhysicalDevice {
+                name,
+                driver,
+                handle: physical_device,
+                reason: format!("No suitable graphics queue family"),
+            }))
         }
     };
 
-    // early check as we need swapchain extension before looking its support
-    if !check_physical_device_extensions {
-        return false;
+    /* Check the physical device has all the required features */
+    let features_check = requirements::physical_device_features_check(features, features_1_2, features_1_3);
+    if !features_check {
+        return Ok(DeviceClassification::Unusable(VkUnusablePhysicalDevice {
+            name,
+            driver,
+            handle: physical_device,
+            reason: format!("Device does not have the required features"),
+        }));
     }
 
-    // check the device can create the swapchain
-    let device_has_sapchain_support =
-        match super::swapchain_support::SwapchainSupport::get(surface_instance, physical_device, surface) {
-            Ok(swapchain_support) => swapchain_support.suitable(),
-            Err(e) => {
-                log::warn!("Failed to fetch swapchain support for physical device {physical_device:?}: {e}, default to false");
-                false
-            }
-        };
-
-    at_least_one_queue_can_present && physical_device_contains_all_features && device_has_sapchain_support
-}
-
-/// for all features, if it is in the required, it must be in the physical device
-/// In other words, we have the following:
-/// required    | actual    | result
-/// 0           | 0         | 1
-/// 0           | 1         | 1
-/// 1           | 0         | 0
-/// 1           | 1         | 1
-/// so result = !required | actual
-/// With u32 instead of bools, the neg is 1-value, and we use bit ops
-fn physical_device_contains_all_features(features: ash::vk::PhysicalDeviceFeatures) -> bool {
-    (1 - REQUIRED_DEVICE_FEATURES.robust_buffer_access | features.robust_buffer_access)
-        & (1 - REQUIRED_DEVICE_FEATURES.full_draw_index_uint32 | features.full_draw_index_uint32)
-        & (1 - REQUIRED_DEVICE_FEATURES.image_cube_array | features.image_cube_array)
-        & (1 - REQUIRED_DEVICE_FEATURES.independent_blend | features.independent_blend)
-        & (1 - REQUIRED_DEVICE_FEATURES.geometry_shader | features.geometry_shader)
-        & (1 - REQUIRED_DEVICE_FEATURES.tessellation_shader | features.tessellation_shader)
-        & (1 - REQUIRED_DEVICE_FEATURES.sample_rate_shading | features.sample_rate_shading)
-        & (1 - REQUIRED_DEVICE_FEATURES.dual_src_blend | features.dual_src_blend)
-        & (1 - REQUIRED_DEVICE_FEATURES.logic_op | features.logic_op)
-        & (1 - REQUIRED_DEVICE_FEATURES.multi_draw_indirect | features.multi_draw_indirect)
-        & (1 - REQUIRED_DEVICE_FEATURES.draw_indirect_first_instance | features.draw_indirect_first_instance)
-        & (1 - REQUIRED_DEVICE_FEATURES.depth_clamp | features.depth_clamp)
-        & (1 - REQUIRED_DEVICE_FEATURES.depth_bias_clamp | features.depth_bias_clamp)
-        & (1 - REQUIRED_DEVICE_FEATURES.fill_mode_non_solid | features.fill_mode_non_solid)
-        & (1 - REQUIRED_DEVICE_FEATURES.depth_bounds | features.depth_bounds)
-        & (1 - REQUIRED_DEVICE_FEATURES.wide_lines | features.wide_lines)
-        & (1 - REQUIRED_DEVICE_FEATURES.large_points | features.large_points)
-        & (1 - REQUIRED_DEVICE_FEATURES.alpha_to_one | features.alpha_to_one)
-        & (1 - REQUIRED_DEVICE_FEATURES.multi_viewport | features.multi_viewport)
-        & (1 - REQUIRED_DEVICE_FEATURES.sampler_anisotropy | features.sampler_anisotropy)
-        & (1 - REQUIRED_DEVICE_FEATURES.texture_compression_etc2 | features.texture_compression_etc2)
-        & (1 - REQUIRED_DEVICE_FEATURES.texture_compression_astc_ldr | features.texture_compression_astc_ldr)
-        & (1 - REQUIRED_DEVICE_FEATURES.texture_compression_bc | features.texture_compression_bc)
-        & (1 - REQUIRED_DEVICE_FEATURES.occlusion_query_precise | features.occlusion_query_precise)
-        & (1 - REQUIRED_DEVICE_FEATURES.pipeline_statistics_query | features.pipeline_statistics_query)
-        & (1 - REQUIRED_DEVICE_FEATURES.vertex_pipeline_stores_and_atomics | features.vertex_pipeline_stores_and_atomics)
-        & (1 - REQUIRED_DEVICE_FEATURES.fragment_stores_and_atomics | features.fragment_stores_and_atomics)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_tessellation_and_geometry_point_size
-            | features.shader_tessellation_and_geometry_point_size)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_image_gather_extended | features.shader_image_gather_extended)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_storage_image_extended_formats | features.shader_storage_image_extended_formats)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_storage_image_multisample | features.shader_storage_image_multisample)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_storage_image_read_without_format
-            | features.shader_storage_image_read_without_format)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_storage_image_write_without_format
-            | features.shader_storage_image_write_without_format)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_uniform_buffer_array_dynamic_indexing
-            | features.shader_uniform_buffer_array_dynamic_indexing)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_sampled_image_array_dynamic_indexing
-            | features.shader_sampled_image_array_dynamic_indexing)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_storage_buffer_array_dynamic_indexing
-            | features.shader_storage_buffer_array_dynamic_indexing)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_storage_image_array_dynamic_indexing
-            | features.shader_storage_image_array_dynamic_indexing)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_clip_distance | features.shader_clip_distance)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_cull_distance | features.shader_cull_distance)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_float64 | features.shader_float64)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_int64 | features.shader_int64)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_int16 | features.shader_int16)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_resource_residency | features.shader_resource_residency)
-        & (1 - REQUIRED_DEVICE_FEATURES.shader_resource_min_lod | features.shader_resource_min_lod)
-        & (1 - REQUIRED_DEVICE_FEATURES.sparse_binding | features.sparse_binding)
-        & (1 - REQUIRED_DEVICE_FEATURES.sparse_residency_buffer | features.sparse_residency_buffer)
-        & (1 - REQUIRED_DEVICE_FEATURES.sparse_residency_image2_d | features.sparse_residency_image2_d)
-        & (1 - REQUIRED_DEVICE_FEATURES.sparse_residency_image3_d | features.sparse_residency_image3_d)
-        & (1 - REQUIRED_DEVICE_FEATURES.sparse_residency2_samples | features.sparse_residency2_samples)
-        & (1 - REQUIRED_DEVICE_FEATURES.sparse_residency4_samples | features.sparse_residency4_samples)
-        & (1 - REQUIRED_DEVICE_FEATURES.sparse_residency8_samples | features.sparse_residency8_samples)
-        & (1 - REQUIRED_DEVICE_FEATURES.sparse_residency16_samples | features.sparse_residency16_samples)
-        & (1 - REQUIRED_DEVICE_FEATURES.sparse_residency_aliased | features.sparse_residency_aliased)
-        & (1 - REQUIRED_DEVICE_FEATURES.variable_multisample_rate | features.variable_multisample_rate)
-        & (1 - REQUIRED_DEVICE_FEATURES.inherited_queries | features.inherited_queries)
-        > 0
-}
-
-fn check_physical_device_extensions(
-    instance: &ash::Instance,
-    physical_device: ash::vk::PhysicalDevice,
-) -> Result<bool, crate::ScError> {
-    let extensions = unsafe { instance.enumerate_device_extension_properties(physical_device)? }
-        .iter()
-        .map(|extension| extension.extension_name)
-        .collect::<std::collections::HashSet<_>>();
-
-    for required_extension in REQUIRED_DEVICE_EXTENSIONS {
-        use std::ops::Deref;
-        if !extensions.contains(required_extension.deref()) {
-            return Ok(false);
-        }
+    /* Check the physical device has all the required extensions */
+    let extensions_check = requirements::physical_device_extensions_check(&supported_extensions);
+    if !extensions_check {
+        return Ok(DeviceClassification::Unusable(VkUnusablePhysicalDevice {
+            name,
+            driver,
+            handle: physical_device,
+            reason: format!("Device does not have the required extensions"),
+        }));
     }
 
-    Ok(true)
+    /* check the surface can be supported by the device */
+    if surface_support.formats().is_empty() || surface_support.present_modes().is_empty() {
+        return Ok(DeviceClassification::Unusable(VkUnusablePhysicalDevice {
+            name,
+            driver,
+            handle: physical_device,
+            reason: format!("Device has insufficient surface support"),
+        }));
+    }
+
+    Ok(DeviceClassification::Usable(VkPhysicalDevice {
+        name,
+        driver,
+        handle: physical_device,
+        properties,
+        properties_1_2,
+        properties_1_3,
+        memory_properties,
+        features,
+        features_1_2,
+        features_1_3,
+        queue_families,
+        supported_extensions,
+        surface_support,
+        queue_family_indices,
+    }))
+}
+
+/// Container regrouping usable and unusable devices.
+enum DeviceClassification {
+    Usable(VkPhysicalDevice),
+    Unusable(VkUnusablePhysicalDevice),
 }

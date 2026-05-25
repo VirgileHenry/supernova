@@ -26,7 +26,6 @@ impl SystemMap {
     }
 
     pub fn add<S: System + 'static>(&mut self, system: S) {
-        log::info!("Loading system {}", std::any::type_name::<S>());
         let prev = self.inner.insert(
             std::any::TypeId::of::<S>(),
             SystemWrapper {
@@ -76,7 +75,7 @@ impl SystemWrapper {
 #[derive(Clone)]
 pub enum SystemEvent<'a> {
     SwapchainRecreationRequest {
-        vulkan_state: &'a crate::propellant::VulkanState,
+        vulkan_state: &'a crate::propellant::VkInstance,
         window: &'a winit::window::Window,
     },
 }

@@ -1,160 +1,185 @@
+/// Index of a queue family.
+type QueueFamilyIndex = u32;
+
 #[derive(Debug, Clone, Copy)]
 pub struct QueueFamilyIndices {
-    /// Index of the mainstream graphics queue family
-    pub graphics: (u32, u32),
-    /// Index of the presentation queue family
-    /// best if the same as graphics, to avoid concurrent access to images through queues ?
-    pub present: Option<(u32, u32)>,
-    /// Index of the transfer dedicated queue family index.
-    /// If this is none, the GPU only allows to build one queue.
-    /// Otherwise, we have the index and offset of the queue.
-    /// If the index is different than the graphics queue, offset would be zero
-    /// If offset is one, we are using the next queue of the graphics queue family.
-    pub transfer: Option<(u32, u32)>,
-    /// Index of any dedicated compute queue.
-    /// Same logic as for the transfer queue ?
-    pub compute: Option<(u32, u32)>,
+    /// The family that handles graphics work and presentation.
+    pub graphics: QueueFamilyIndex,
+
+    /// Family for async transfers.
+    pub transfer: QueueFamilyIndex,
+
+    /// Family for async compute.
+    pub compute: QueueFamilyIndex,
 }
 
 impl QueueFamilyIndices {
-    /// Get the different prefered queue family indices.
-    /// TODO: This whole things is to redo, taking into account:
-    /// - Maybe compute and transfer index ca be the same as graphics, if enough queues can be built
-    /// - I have no clue how to pick the best queue if we have multiple choices
+    /// Find the preferred queue family indices for the engine.
+    ///
+    /// Returns `Ok(None)` if no graphics-capable queue family that can also
+    /// present to the given surface exists on this device — i.e. the device
+    /// is unsuitable.
     pub fn get(
         instance: &ash::Instance,
         surface_instance: &ash::khr::surface::Instance,
-        physical_device: ash::vk::PhysicalDevice,
         surface: ash::vk::SurfaceKHR,
-    ) -> Result<QueueFamilyIndices, crate::ScError> {
-        let queues_family_indices = unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
-        let mut used_indices = std::collections::HashMap::new();
+        physical_device: ash::vk::PhysicalDevice,
+    ) -> ash::prelude::VkResult<Option<QueueFamilyIndices>> {
+        let queue_family_properties = unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
 
-        // create a special closure to validate present queue: we need to fetch the fact that the queue can present from an surface instance call
-        // we use a closure so it can capture the required instance & surface, without bloating the required closure params for every other queue
-        let validate_present_index = create_validate_present_index(surface_instance, physical_device, surface);
-
-        let graphics = Self::get_best_index_for(
-            &queues_family_indices,
-            validate_graphics_index,
-            score_graphics_index,
-            &mut used_indices,
-        )
-        .ok_or("No Graphics queue family available!")?;
-        let present = Self::get_best_index_for(
-            &queues_family_indices,
-            validate_present_index,
-            score_present_index,
-            &mut used_indices,
-        );
-        let transfer = Self::get_best_index_for(
-            &queues_family_indices,
-            validate_transfer_index,
-            score_transfer_index,
-            &mut used_indices,
-        );
-        let compute = Self::get_best_index_for(
-            &queues_family_indices,
-            validate_compute_index,
-            score_compute_index,
-            &mut used_indices,
-        );
-
-        Ok(QueueFamilyIndices {
-            graphics,
-            present,
-            transfer,
-            compute,
-        })
-    }
-
-    fn get_best_index_for<ValidateFunc, ScoreFunc>(
-        queues_family_indices: &[ash::vk::QueueFamilyProperties],
-        v_func: ValidateFunc,
-        s_func: ScoreFunc,
-        used_indices: &mut std::collections::HashMap<usize, u32>,
-    ) -> Option<(u32, u32)>
-    where
-        ValidateFunc: Fn(usize, ash::vk::QueueFamilyProperties) -> bool,
-        ScoreFunc: Fn(ash::vk::QueueFamilyProperties) -> i32,
-    {
-        // Get the index of the queue family that best fit our validate and score functions, while still being available
-        let chosen_index = queues_family_indices
-            .iter()
-            .enumerate()
-            // Keep only family properties that match the validate function
-            .filter(|(index, properties)| v_func(*index, **properties))
-            // Keep only families with remaining queues
-            .filter(|(i, properties)| match used_indices.get(i) {
-                Some(used_count) => properties.queue_count > *used_count,
-                None => properties.queue_count > 0,
-            })
-            // Get the family with best score
-            .max_by(|(_, prop1), (_, prop2)| s_func(**prop1).cmp(&s_func(**prop2)))
-            .map(|(index, _)| index)?;
-
-        // update the used index with our pick and get our offset
-        let offset = match used_indices.get_mut(&chosen_index) {
-            Some(used_count) => {
-                let offset = *used_count;
-                *used_count += 1;
-                offset
-            }
-            None => {
-                used_indices.insert(chosen_index, 1);
-                0
-            }
+        let graphics = match find_graphics_queue(surface_instance, surface, physical_device, &queue_family_properties)? {
+            Some(indices) => indices,
+            None => return Ok(None),
         };
-        Some((chosen_index as u32, offset))
+
+        let dedicated_transfer = find_transfer_queue(&queue_family_properties, graphics).unwrap_or(graphics);
+        let dedicated_compute = find_compute_queue(&queue_family_properties, graphics).unwrap_or(graphics);
+
+        Ok(Some(QueueFamilyIndices {
+            graphics,
+            transfer: dedicated_transfer,
+            compute: dedicated_compute,
+        }))
+    }
+
+    pub fn to_queue_create_infos(&self) -> Vec<ash::vk::DeviceQueueCreateInfo<'static>> {
+        const QUEUE_PRIORITIES: &[f32] = &[1.0];
+
+        /* Use a hashset to get unique families */
+        let mut families = std::collections::HashSet::new();
+        families.insert(self.graphics);
+        families.insert(self.transfer);
+        families.insert(self.compute);
+
+        let mut unique_families: Vec<_> = families.into_iter().collect();
+        unique_families.sort();
+
+        unique_families
+            .into_iter()
+            .map(|family| {
+                ash::vk::DeviceQueueCreateInfo::default()
+                    .queue_family_index(family)
+                    .queue_priorities(QUEUE_PRIORITIES)
+            })
+            .collect()
     }
 }
 
-fn validate_graphics_index(_: usize, properties: ash::vk::QueueFamilyProperties) -> bool {
-    properties.queue_flags.contains(ash::vk::QueueFlags::GRAPHICS)
-}
-
-fn score_graphics_index(_: ash::vk::QueueFamilyProperties) -> i32 {
-    0 // TODO
-}
-
-fn create_validate_present_index(
-    instance: &ash::khr::surface::Instance,
-    physical_device: ash::vk::PhysicalDevice,
+/// Function to find the most suitable graphics queue.
+fn find_graphics_queue(
+    surface_instance: &ash::khr::surface::Instance,
     surface: ash::vk::SurfaceKHR,
-) -> impl Fn(usize, ash::vk::QueueFamilyProperties) -> bool + '_ {
-    move |queue_family_index, _| match unsafe {
-        instance.get_physical_device_surface_support(physical_device, queue_family_index as u32, surface)
-    } {
-        Ok(res) => res,
-        Err(e) => {
-            log::warn!("Failed to read device surface support: {e}, default to false");
-            false
-        }
+    physical_device: ash::vk::PhysicalDevice,
+    queue_family_properties: &[ash::vk::QueueFamilyProperties],
+) -> ash::prelude::VkResult<Option<QueueFamilyIndex>> {
+    struct QueueFamilyCandidate<'a> {
+        index: u32,
+        properties: &'a ash::vk::QueueFamilyProperties,
     }
+
+    let mut graphics_candidates: Vec<QueueFamilyCandidate> = Vec::new();
+
+    for (index, properties) in queue_family_properties.iter().enumerate() {
+        let index = index as u32;
+
+        /* Check the graphics flags */
+        if !properties.queue_flags.contains(ash::vk::QueueFlags::GRAPHICS) {
+            continue;
+        }
+        /* Check the queue can support our current surface */
+        if !unsafe { surface_instance.get_physical_device_surface_support(physical_device, index, surface) }? {
+            continue;
+        }
+
+        graphics_candidates.push(QueueFamilyCandidate { index, properties });
+    }
+
+    /* Get the best candidate. */
+    /* The criterion for graphics is the family with the most flags available */
+    let best_candidate = graphics_candidates
+        .into_iter()
+        .max_by_key(|candidate| candidate.properties.queue_flags.as_raw().count_ones())
+        .map(|candidate| candidate.index);
+
+    Ok(best_candidate)
 }
 
-fn score_present_index(_: ash::vk::QueueFamilyProperties) -> i32 {
-    0 // TODO
+fn find_transfer_queue(
+    queue_family_properties: &[ash::vk::QueueFamilyProperties],
+    graphics: QueueFamilyIndex,
+) -> Option<QueueFamilyIndex> {
+    struct QueueFamilyCandidate<'a> {
+        index: u32,
+        properties: &'a ash::vk::QueueFamilyProperties,
+    }
+
+    let mut transfer_candidates: Vec<QueueFamilyCandidate> = Vec::new();
+
+    for (index, properties) in queue_family_properties.iter().enumerate() {
+        let index = index as u32;
+
+        /* Take a different family than the graphics */
+        if index == graphics {
+            continue;
+        }
+        /* Check the family has the transfer flag */
+        if !properties.queue_flags.contains(ash::vk::QueueFlags::TRANSFER) {
+            continue;
+        }
+        /* Avoid queues with the graphics family, only transfer for dedicated family */
+        if properties.queue_flags.contains(ash::vk::QueueFlags::GRAPHICS) {
+            continue;
+        }
+
+        transfer_candidates.push(QueueFamilyCandidate { index, properties });
+    }
+
+    /* Get the best candidate. */
+    /* The criterion for transfer is the most specialized queue, i.e. the least feature flags */
+    let best_candidate = transfer_candidates
+        .into_iter()
+        .min_by_key(|candidate| candidate.properties.queue_flags.as_raw().count_ones())
+        .map(|candidate| candidate.index);
+
+    best_candidate
 }
 
-fn validate_transfer_index(_: usize, properties: ash::vk::QueueFamilyProperties) -> bool {
-    properties.queue_flags.contains(ash::vk::QueueFlags::TRANSFER)
-}
+fn find_compute_queue(
+    queue_family_properties: &[ash::vk::QueueFamilyProperties],
+    graphics: QueueFamilyIndex,
+) -> Option<QueueFamilyIndex> {
+    struct QueueFamilyCandidate<'a> {
+        index: u32,
+        properties: &'a ash::vk::QueueFamilyProperties,
+    }
 
-fn score_transfer_index(properties: ash::vk::QueueFamilyProperties) -> i32 {
-    // the least flags on the queue, the better: it means the queue is desiged for transfer
-    let mut score = 0;
-    score -= properties.queue_flags.as_raw().count_ones() as i32;
-    score
-}
+    let mut compute_candidates: Vec<QueueFamilyCandidate> = Vec::new();
 
-fn validate_compute_index(_: usize, properties: ash::vk::QueueFamilyProperties) -> bool {
-    properties.queue_flags.contains(ash::vk::QueueFlags::COMPUTE)
-}
+    for (index, properties) in queue_family_properties.iter().enumerate() {
+        let index = index as u32;
 
-fn score_compute_index(properties: ash::vk::QueueFamilyProperties) -> i32 {
-    // the least flags on the queue, the better: it means the queue is desiged for transfer
-    let mut score = 0;
-    score -= properties.queue_flags.as_raw().count_ones() as i32;
-    score
+        /* Take a different family than the graphics */
+        if index == graphics {
+            continue;
+        }
+        /* Check the family has the compute flag */
+        if !properties.queue_flags.contains(ash::vk::QueueFlags::COMPUTE) {
+            continue;
+        }
+        /* Avoid queues with the graphics family, only compute for dedicated family */
+        if properties.queue_flags.contains(ash::vk::QueueFlags::GRAPHICS) {
+            continue;
+        }
+
+        compute_candidates.push(QueueFamilyCandidate { index, properties });
+    }
+
+    /* Get the best candidate. */
+    /* The criterion for compute is the family with the most queues available */
+    let best_candidate = compute_candidates
+        .into_iter()
+        .max_by_key(|candidate| candidate.properties.queue_count)
+        .map(|candidate| candidate.index);
+
+    best_candidate
 }

@@ -10,7 +10,6 @@ mod scene;
 mod vulkan;
 
 pub use application::Application;
-pub use assets::AssetHandle;
 pub use assets::AssetManager;
 pub use event::EngineEvent;
 pub use host::EngineHost;
@@ -19,4 +18,5 @@ pub use scene::Scene;
 pub use scene::System;
 pub use scene::SystemEvent;
 pub use scene::UpdateFrequency;
-pub use vulkan::VulkanState;
+pub use vulkan::VkDevice;
+pub use vulkan::VkInstance;
