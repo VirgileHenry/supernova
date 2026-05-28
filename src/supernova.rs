@@ -35,15 +35,15 @@ impl crate::propellant::Application for SupernovaApp {
             .ok_or_else(|| crate::ScError::Generic("Unable to create a Vulkan device: no suitable physical devices!"))?;
         let vk_device = crate::propellant::VkDevice::create(&vk_instance, prefered_physical_device.clone())?;
 
+        /* Load the assets up */
+        let assets = crate::propellant::AssetManager::load(vk_device.clone(), "assets")?;
+
         // loading screen is no longer required, as main resources are created and we can proceed with main loop and let the engine manage
         // drop(loading_screen);
 
         // load start scene
         // Fixme: that's not the main menu, need loading scene to load the game up
-        let scene = crate::propellant::Scene::main_menu(&vk_instance, vk_device.clone(), &window, proxy.clone())?;
-
-        /* Load the assets up */
-        let assets = crate::propellant::AssetManager::load("assets")?;
+        let scene = crate::propellant::Scene::test_scene(&vk_instance, vk_device.clone(), &window, proxy.clone(), &assets)?;
 
         Ok(Self {
             window,
@@ -55,12 +55,16 @@ impl crate::propellant::Application for SupernovaApp {
         })
     }
 
+    fn window(&self) -> &winit::window::Window {
+        &self.window
+    }
+
     fn tick(&mut self) {
         let now = std::time::Instant::now();
         let delta_time = now - self.last_update;
         self.last_update = now;
 
-        self.scene.update(delta_time);
+        self.scene.update(&self.assets, delta_time);
     }
 
     fn handle_window_event(

@@ -5,6 +5,7 @@ mod segment;
 
 pub use handle::AssetHandle;
 pub use manager::AssetManager;
+pub use segment::Segment;
 
 pub trait Asset: Sized {
     fn name(&self) -> &str;

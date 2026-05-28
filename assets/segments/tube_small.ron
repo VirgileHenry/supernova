@@ -1,6 +1,6 @@
 #![enable(unwrap_variant_newtypes)]
 (
-    name: "Tube Small",
+    name: "tube_small",
     shell: Cylinder(
         a: Vec3(1.0, 0.0, 0.0),
         b: Vec3(-1.0, 0.0, 0.0),

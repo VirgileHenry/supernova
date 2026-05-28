@@ -85,9 +85,9 @@ impl VkDevice {
         };
 
         log::info!("Created logical device with the following queues:");
-        log::info!(" ├─ Graphics: Owned");
-        log::info!(" ├─ Transfer: {}", transfer_queue.ownership());
-        log::info!(" └─ Compute: {}", compute_queue.ownership());
+        log::info!(" - Graphics: Owned");
+        log::info!(" - Transfer: {}", transfer_queue.ownership());
+        log::info!(" - Compute: {}", compute_queue.ownership());
 
         Ok(std::sync::Arc::new(Self {
             device: device,

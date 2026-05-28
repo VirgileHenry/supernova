@@ -1,7 +1,6 @@
+use crate::csg::ops;
 use crate::csg::primitive;
-use crate::csg::types::Float;
-use crate::csg::types::Quat;
-use crate::csg::types::Vec3;
+use crate::csg::CsgNode;
 
 /// Authored CSG tree. Each variant either is a primitive leaf, a unary op
 /// with a boxed child, an n-ary combinator with a vec of children, or a
@@ -31,50 +30,43 @@ pub enum CsgTree {
 
     // --- Unary ops (one inline child) ---
     Round {
-        radius: Float,
+        node: ops::Round,
         child: Box<CsgTree>,
     },
     Extrude {
-        extrusion: Vec3,
+        node: ops::Extrude,
         child: Box<CsgTree>,
     },
     Revolve {
-        axis_base: Vec3,
-        axis_dir: Vec3,
+        node: ops::Revolve,
         child: Box<CsgTree>,
     },
     PlanarSym {
-        plane_base: Vec3,
-        plane_normal: Vec3,
+        node: ops::PlanarSymmetry,
         child: Box<CsgTree>,
     },
     AxialSym {
-        axis_base: Vec3,
-        axis_dir: Vec3,
-        clone_count: u32,
+        node: ops::AxialSymmetry,
         child: Box<CsgTree>,
     },
     Elongate {
-        elongation: Vec3,
+        node: ops::Elongate,
         child: Box<CsgTree>,
     },
     Onion {
-        thickness: Float,
+        node: ops::Onion,
         child: Box<CsgTree>,
     },
     Twist {
-        direction: Vec3,
-        amount: Float,
+        node: ops::Twist,
         child: Box<CsgTree>,
     },
     Bend {
-        curvature_normal: Vec3,
+        node: ops::Bend,
         child: Box<CsgTree>,
     },
     Transform {
-        offset: Vec3,
-        size: Vec3,
-        rotation: Quat,
+        node: ops::Transform,
         child: Box<CsgTree>,
     },
 
@@ -86,11 +78,11 @@ pub enum CsgTree {
         children: Vec<CsgTree>,
     },
     SmoothUnion {
-        amount: Float,
+        node: ops::SmoothUnion,
         children: Vec<CsgTree>,
     },
     SmoothIntersect {
-        amount: Float,
+        node: ops::SmoothIntersect,
         children: Vec<CsgTree>,
     },
 
@@ -100,170 +92,117 @@ pub enum CsgTree {
         subtract: Box<CsgTree>,
     },
     SmoothDifference {
-        amount: Float,
+        node: ops::SmoothDifference,
         base: Box<CsgTree>,
         subtract: Box<CsgTree>,
     },
 }
 
-/*
 impl CsgTree {
-    /// Flatten to post-order. Operands come before operators; n-ary ops
-    /// carry their child count so the GPU stack-evaluator knows how many
-    /// values to pop.
-    pub fn flatten(&self) -> FlatCsg {
+    pub fn flatten(&self) -> Vec<crate::csg::CsgNodeRepr> {
         let mut nodes = Vec::new();
         self.flatten_into(&mut nodes);
-        FlatCsg { nodes }
+        nodes
     }
 
-    fn flatten_into(&self, out: &mut Vec<FlatNode>) {
+    fn flatten_into(&self, out: &mut Vec<crate::csg::CsgNodeRepr>) {
         match self {
+            // Empty
+            CsgTree::Empty => out.push(crate::csg::CsgNodeRepr::new(crate::csg::opcodes::EMPTY, 0, [0.0; 12])),
+
             // Primitives push directly.
-            CsgTree::Sphere(s) => out.push(FlatNode::Sphere(*s)),
-            CsgTree::Cube(c) => out.push(FlatNode::Cube(*c)),
-            CsgTree::Torus(t) => out.push(FlatNode::Torus(*t)),
-            CsgTree::CubeFrame(c) => out.push(FlatNode::CubeFrame(*c)),
-            CsgTree::Cone(c) => out.push(FlatNode::Cone(*c)),
-            CsgTree::Triangle(t) => out.push(FlatNode::Triangle(*t)),
-            CsgTree::RegularHexagon(h) => out.push(FlatNode::RegularHexagon(*h)),
-            CsgTree::Capsule(c) => out.push(FlatNode::Capsule(*c)),
-            CsgTree::Cylinder(c) => out.push(FlatNode::Cylinder(*c)),
-            CsgTree::Ellipse(e) => out.push(FlatNode::Ellipse(*e)),
-            CsgTree::Octahedron(o) => out.push(FlatNode::Octahedron(*o)),
-            CsgTree::Pyramid(p) => out.push(FlatNode::Pyramid(*p)),
+            CsgTree::Sphere(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::Cube(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::Torus(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::CubeFrame(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::Cone(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::Triangle(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::RegularHexagon(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::Capsule(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::Cylinder(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::Ellipse(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::Octahedron(primitive) => out.push(primitive.to_repr(0)),
+            CsgTree::Pyramid(primitive) => out.push(primitive.to_repr(0)),
 
             // Unary ops: flatten child, then push operator.
-            CsgTree::Round { radius, child } => {
+            CsgTree::Round { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::Round { radius: *radius });
             }
-            CsgTree::Extrude { extrusion, child } => {
+            CsgTree::Extrude { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::Extrude { extrusion: *extrusion });
             }
-            CsgTree::Revolve {
-                axis_base,
-                axis_dir,
-                child,
-            } => {
+            CsgTree::Revolve { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::Revolve {
-                    axis_base: *axis_base,
-                    axis_dir: *axis_dir,
-                });
             }
-            CsgTree::PlanarSym {
-                plane_base,
-                plane_normal,
-                child,
-            } => {
+            CsgTree::PlanarSym { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::PlanarSym {
-                    plane_base: *plane_base,
-                    plane_normal: *plane_normal,
-                });
             }
-            CsgTree::AxialSym {
-                axis_base,
-                axis_dir,
-                clone_count,
-                child,
-            } => {
+            CsgTree::AxialSym { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::AxialSym {
-                    axis_base: *axis_base,
-                    axis_dir: *axis_dir,
-                    clone_count: *clone_count,
-                });
             }
-            CsgTree::Elongate { elongation, child } => {
+            CsgTree::Elongate { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::Elongate { elongation: *elongation });
             }
-            CsgTree::Onion { thickness, child } => {
+            CsgTree::Onion { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::Onion { thickness: *thickness });
             }
-            CsgTree::Twist {
-                direction,
-                amount,
-                child,
-            } => {
+            CsgTree::Twist { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::Twist {
-                    direction: *direction,
-                    amount: *amount,
-                });
             }
-            CsgTree::Bend { curvature_normal, child } => {
+            CsgTree::Bend { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::Bend {
-                    curvature_normal: *curvature_normal,
-                });
             }
-            CsgTree::Transform {
-                offset,
-                size,
-                rotation,
-                child,
-            } => {
+            CsgTree::Transform { node, child } => {
+                out.push(node.to_repr(1));
                 child.flatten_into(out);
-                out.push(FlatNode::Transform {
-                    offset: *offset,
-                    size: *size,
-                    rotation: *rotation,
-                });
             }
 
             // N-ary: flatten all children left-to-right, then push op with count.
             CsgTree::Union { children } => {
+                out.push(ops::Union.to_repr(children.len() as u32));
                 for c in children {
                     c.flatten_into(out);
                 }
-                out.push(FlatNode::Union {
-                    child_count: children.len() as u32,
-                });
             }
             CsgTree::Intersect { children } => {
+                out.push(ops::Intersect.to_repr(children.len() as u32));
                 for c in children {
                     c.flatten_into(out);
                 }
-                out.push(FlatNode::Intersect {
-                    child_count: children.len() as u32,
-                });
             }
-            CsgTree::SmoothUnion { amount, children } => {
+            CsgTree::SmoothUnion { node, children } => {
+                out.push(node.to_repr(children.len() as u32));
                 for c in children {
                     c.flatten_into(out);
                 }
-                out.push(FlatNode::SmoothUnion {
-                    amount: *amount,
-                    child_count: children.len() as u32,
-                });
             }
-            CsgTree::SmoothIntersect { amount, children } => {
+            CsgTree::SmoothIntersect { node, children } => {
+                out.push(node.to_repr(children.len() as u32));
                 for c in children {
                     c.flatten_into(out);
                 }
-                out.push(FlatNode::SmoothIntersect {
-                    amount: *amount,
-                    child_count: children.len() as u32,
-                });
             }
 
             // Binary asymmetric: base first, then subtract.
             CsgTree::Difference { base, subtract } => {
+                out.push(ops::Difference.to_repr(2));
                 base.flatten_into(out);
                 subtract.flatten_into(out);
-                out.push(FlatNode::Difference);
             }
-            CsgTree::SmoothDifference { amount, base, subtract } => {
+            CsgTree::SmoothDifference { node, base, subtract } => {
+                out.push(node.to_repr(2));
                 base.flatten_into(out);
                 subtract.flatten_into(out);
-                out.push(FlatNode::SmoothDifference { amount: *amount });
             }
         }
     }
 }
- */

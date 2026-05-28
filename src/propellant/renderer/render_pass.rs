@@ -9,11 +9,12 @@ pub trait RenderingPass {
     type Output<'output>;
     fn render<'input, 'output>(
         &self,
-        world: &hecs::World,
         vk_device: &vulkan::VkDeviceHandle,
+        assets: &crate::propellant::assets::AssetManager,
+        world: &hecs::World,
         input: &Self::Input<'input>,
         out: &mut Self::Output<'output>,
-    );
+    ) -> ash::prelude::VkResult<()>;
 }
 
 #[derive(Debug, Clone)]

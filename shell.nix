@@ -22,6 +22,4 @@ pkgs.mkShell {
   SHADERC_LIB_DIR="${pkgs.shaderc.lib}/lib";
   # configure some rust env vars
   RUST_BACKTRACE=1;
-  # env_logger config
-  RUST_LOG="info";
 }

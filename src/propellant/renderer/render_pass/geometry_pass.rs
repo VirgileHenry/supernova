@@ -18,49 +18,6 @@ pub struct GeometryPass {
     render_pass: ash::vk::RenderPass,
 }
 
-impl super::RenderingPass for GeometryPass {
-    type Input<'input> = GeometryPassInput;
-    type Output<'output> = GeometryPassOutput<'output>;
-
-    fn render<'input, 'output>(
-        &self,
-        world: &hecs::World,
-        vk_device: &vulkan::VkDeviceHandle,
-        input: &Self::Input<'input>,
-        out: &mut Self::Output<'output>,
-    ) {
-        // temp rendering code here!
-
-        let clear_color = ash::vk::ClearValue {
-            color: ash::vk::ClearColorValue {
-                float32: [0., 0., 0., 1.],
-            },
-        };
-
-        let clear_values = [clear_color];
-
-        let render_pass_begin = ash::vk::RenderPassBeginInfo {
-            render_pass: self.render_pass,
-            framebuffer: out.target.framebuffer,
-            render_area: input.render_area,
-            clear_value_count: clear_values.len() as u32,
-            p_clear_values: if clear_values.is_empty() {
-                std::ptr::null()
-            } else {
-                clear_values.as_ptr()
-            },
-            ..Default::default()
-        };
-
-        unsafe {
-            vk_device.cmd_begin_render_pass(*input.command_buffer, &render_pass_begin, ash::vk::SubpassContents::INLINE);
-            vk_device.cmd_bind_pipeline(*input.command_buffer, ash::vk::PipelineBindPoint::GRAPHICS, self.pipeline);
-            vk_device.cmd_draw(*input.command_buffer, 3, 1, 0, 0);
-            vk_device.cmd_end_render_pass(*input.command_buffer);
-        };
-    }
-}
-
 impl GeometryPass {
     pub fn create(vk_device: &vulkan::VkDeviceHandle, swapchain: &vulkan::VkSwapchain) -> Result<GeometryPass, crate::ScError> {
         let vertex_shader = vk_device.load_shader_module(shaders::EXAMPLE_VERT.code)?;
@@ -159,30 +116,23 @@ impl GeometryPass {
 
         let stages = [vert_stage, frag_stage];
 
-        let create_infos = [ash::vk::GraphicsPipelineCreateInfo {
-            stage_count: stages.len() as u32,
-            p_stages: if stages.is_empty() {
-                std::ptr::null()
-            } else {
-                stages.as_ptr()
-            },
-            p_vertex_input_state: &vertex_input_state,
-            p_input_assembly_state: &input_assembly_state,
-            p_viewport_state: &viewport_state,
-            p_rasterization_state: &rasterization_state,
-            p_multisample_state: &multisample_state,
-            p_color_blend_state: &color_blend_state,
-            layout: pipeline_layout,
-            render_pass,
-            subpass: 0,
-            ..Default::default()
-        }];
+        let create_info = ash::vk::GraphicsPipelineCreateInfo::default()
+            .stages(stages.as_slice())
+            .vertex_input_state(&vertex_input_state)
+            .input_assembly_state(&input_assembly_state)
+            .viewport_state(&viewport_state)
+            .rasterization_state(&rasterization_state)
+            .multisample_state(&multisample_state)
+            .color_blend_state(&color_blend_state)
+            .layout(pipeline_layout)
+            .render_pass(render_pass);
+        let create_infos = [create_info];
 
         let pipeline = unsafe { vk_device.create_graphics_pipelines(ash::vk::PipelineCache::null(), &create_infos, None) }
             .map_err(|(_, e)| e)?
             .remove(0);
 
-        log::info!("Successefuly created geometry render pass");
+        log::debug!("Successefuly created geometry render pass");
 
         unsafe {
             vk_device.destroy_shader_module(vertex_shader, None);
@@ -272,6 +222,60 @@ impl GeometryPass {
         };
 
         Ok(unsafe { vk_device.create_render_pass(&create_info, None)? })
+    }
+}
+
+impl super::RenderingPass for GeometryPass {
+    type Input<'input> = GeometryPassInput;
+    type Output<'output> = GeometryPassOutput<'output>;
+
+    fn render<'input, 'output>(
+        &self,
+        vk_device: &vulkan::VkDeviceHandle,
+        assets: &crate::propellant::assets::AssetManager,
+        world: &hecs::World,
+        input: &Self::Input<'input>,
+        out: &mut Self::Output<'output>,
+    ) -> ash::prelude::VkResult<()> {
+        use crate::propellant::components::*;
+
+        /* Upload camera uniforms ? (support main lights in the future) */
+
+        /* For now, no instancing, let's make draw call for each segment */
+        let mut query = world.query::<(&Transform, &SegmentRenderer)>();
+        for (entity, (transform, segment_renderer)) in query.iter() {}
+
+        /* Previous rendering code */
+        let clear_color = ash::vk::ClearValue {
+            color: ash::vk::ClearColorValue {
+                float32: [0., 0., 0., 1.],
+            },
+        };
+
+        let clear_values = [clear_color];
+
+        let render_pass_begin = ash::vk::RenderPassBeginInfo {
+            render_pass: self.render_pass,
+            framebuffer: out.target.framebuffer,
+            render_area: input.render_area,
+            clear_value_count: clear_values.len() as u32,
+            p_clear_values: if clear_values.is_empty() {
+                std::ptr::null()
+            } else {
+                clear_values.as_ptr()
+            },
+            ..Default::default()
+        };
+
+        unsafe {
+            vk_device.cmd_begin_render_pass(*input.command_buffer, &render_pass_begin, ash::vk::SubpassContents::INLINE);
+            vk_device.cmd_bind_pipeline(*input.command_buffer, ash::vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+            vk_device.cmd_draw(*input.command_buffer, 3, 1, 0, 0);
+            vk_device.cmd_end_render_pass(*input.command_buffer);
+        };
+        /* End of Previous rendering code */
+
+        Ok(())
     }
 }
 

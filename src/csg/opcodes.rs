@@ -1,16 +1,17 @@
 // Primitives: 0..32
-pub const SPHERE: u32 = 0;
-pub const CUBE: u32 = 1;
-pub const TORUS: u32 = 2;
-pub const CUBE_FRAME: u32 = 3;
-pub const CONE: u32 = 4;
-pub const TRIANGLE: u32 = 5;
-pub const REGULAR_HEXAGON: u32 = 6;
-pub const CAPSULE: u32 = 7;
-pub const CYLINDER: u32 = 8;
-pub const ELLIPSE: u32 = 9;
-pub const OCTAHEDRON: u32 = 10;
-pub const PYRAMID: u32 = 11;
+pub const EMPTY: u32 = 0;
+pub const SPHERE: u32 = 1;
+pub const CUBE: u32 = 2;
+pub const TORUS: u32 = 3;
+pub const CUBE_FRAME: u32 = 4;
+pub const CONE: u32 = 5;
+pub const TRIANGLE: u32 = 6;
+pub const REGULAR_HEXAGON: u32 = 7;
+pub const CAPSULE: u32 = 8;
+pub const CYLINDER: u32 = 9;
+pub const ELLIPSE: u32 = 10;
+pub const OCTAHEDRON: u32 = 11;
+pub const PYRAMID: u32 = 12;
 
 // Unary ops: 32..64
 pub const ROUND: u32 = 32;

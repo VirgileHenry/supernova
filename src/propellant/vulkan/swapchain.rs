@@ -77,7 +77,7 @@ impl VkSwapchain {
             .map(|image| image::VkSwapchainImage::create(vk_device, image, surface_format.format))
             .collect::<Result<Vec<_>, _>>()?;
 
-        log::info!(
+        log::debug!(
             "Successefuly created renderer swapchain, with {} images and {} max frames in flight",
             images.len(),
             crate::propellant::vulkan::MAX_FRAMES_IN_FLIGHTS

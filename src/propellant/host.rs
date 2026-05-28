@@ -31,8 +31,6 @@ impl<App: crate::propellant::Application> winit::application::ApplicationHandler
                     log::error!("Failed to init resources: {e}");
                     event_loop.exit();
                 }
-                /* Set event loop to poll */
-                event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
             }
             Some(_) => log::warn!("Received resume event with all resources already created."),
         }
@@ -54,6 +52,13 @@ impl<App: crate::propellant::Application> winit::application::ApplicationHandler
         match self.application_data.as_mut() {
             Some(application) => application.handle_engine_event(event_loop, event),
             None => log::warn!("Unable to handle window event: application not loaded!"),
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        match self.application_data.as_mut() {
+            Some(application) => application.window().request_redraw(),
+            None => {}
         }
     }
 }

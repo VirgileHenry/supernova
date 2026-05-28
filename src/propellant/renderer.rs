@@ -1,5 +1,8 @@
+mod error;
 mod render_pass;
 mod shaders;
+mod uniform_buffer;
+mod uniforms;
 
 use crate::propellant::vulkan;
 
@@ -30,6 +33,9 @@ pub struct Renderer {
     /// Targets for the geometry render pass.
     /// One per image in the swapchain.
     geometry_pass_targets: Vec<render_pass::RenderPassTarget>,
+
+    /// Uniform buffer for the camera uniform.
+    camera_uniform: uniform_buffer::UniformBuffer<uniforms::CameraUniform>,
 }
 
 impl Renderer {
@@ -39,6 +45,8 @@ impl Renderer {
         window: &winit::window::Window,
         event_loop_proxy: crate::propellant::EventLoopProxy,
     ) -> Result<Renderer, crate::ScError> {
+        log::info!("Creating renderer...");
+
         let swapchain = vulkan::VkSwapchain::create(vk_context, &vk_device, window, None)?;
         let synchronization = vulkan::VkSynchronization::create(&vk_device, swapchain.image_count())?;
 
@@ -56,6 +64,8 @@ impl Renderer {
         let frame_count = swapchain.image_count() as u32;
         let graphics_command = vulkan::CommandInterface::create(&vk_device, vk_device.graphics_queue(), frame_count)?;
 
+        let camera_uniform = uniform_buffer::UniformBuffer::create(&vk_device)?;
+
         Ok(Renderer {
             event_loop_proxy,
             vk_device,
@@ -66,10 +76,44 @@ impl Renderer {
             color_pass: color_pass::ColorPass,
             post_proc_pass: post_processing_pass::PostProcessingPass,
             geometry_pass_targets,
+            camera_uniform,
         })
     }
 
-    pub fn render(&mut self, world: &hecs::World) -> ash::prelude::VkResult<()> {
+    pub fn recreate(&mut self, vulkan_state: &vulkan::VkInstance, window: &winit::window::Window) -> Result<(), crate::ScError> {
+        if let Err(e) = unsafe { self.vk_device.device_wait_idle() } {
+            log::warn!("Failed to wait device idle before recreating swapchain: {e}");
+        }
+
+        let new_swapchain = vulkan::VkSwapchain::create(vulkan_state, &self.vk_device, window, Some(&self.swapchain))?;
+        self.swapchain = new_swapchain;
+        self.geometry_pass = geometry_pass::GeometryPass::create(&self.vk_device, &self.swapchain)?;
+
+        let image_views = self.swapchain.image_views();
+        self.geometry_pass_targets = image_views
+            .into_iter()
+            .map(|image| {
+                let attachments = [image];
+                render_pass::RenderPassTarget::create(
+                    &self.vk_device,
+                    self.geometry_pass.render_pass(),
+                    &attachments,
+                    self.swapchain.extent(),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let frame_count = self.swapchain.image_count() as u32;
+        self.graphics_command.recreate_command_buffers(frame_count)?;
+
+        Ok(())
+    }
+
+    pub fn render(
+        &mut self,
+        assets: &crate::propellant::assets::AssetManager,
+        world: &hecs::World,
+    ) -> Result<(), error::RenderError> {
         /* Wait for the frame slot to be usable,  */
         self.synchronization.frame().wait_until_available()?;
 
@@ -80,6 +124,11 @@ impl Renderer {
 
         /* Wait for any frame using this image to terminate */
         self.synchronization.claim_image(image_index)?;
+
+        /* Write the uniforms in the uniform buffers for the frame */
+        if let Err(e) = self.write_uniforms(self.synchronization.frame_index(), world) {
+            log::warn!("Errors while writing frame uniforms: {e}");
+        }
 
         let mut geometry_pass_output = geometry_pass::GeometryPassOutput {
             target: &self.geometry_pass_targets[image_index],
@@ -96,8 +145,16 @@ impl Renderer {
         };
 
         use render_pass::RenderingPass;
-        self.geometry_pass
-            .render(world, &self.vk_device, &geometry_pass_input, &mut geometry_pass_output);
+        let geometry_pass_result = self.geometry_pass.render(
+            &self.vk_device,
+            assets,
+            world,
+            &geometry_pass_input,
+            &mut geometry_pass_output,
+        );
+        if let Err(e) = geometry_pass_result {
+            log::warn!("Geometry pass render failed: {e}");
+        }
 
         /*
         self.color_pass.render(world, &self.vulkan_interface, &(), &mut ());
@@ -137,37 +194,29 @@ impl Renderer {
         self.synchronization.advance();
 
         if acquire.suboptimal {
-            Err(ash::vk::Result::SUBOPTIMAL_KHR)
+            Err(error::RenderError::Vulkan {
+                error: ash::vk::Result::SUBOPTIMAL_KHR,
+            })
         } else {
             Ok(())
         }
     }
 
-    pub fn recreate(&mut self, vulkan_state: &vulkan::VkInstance, window: &winit::window::Window) -> Result<(), crate::ScError> {
-        if let Err(e) = unsafe { self.vk_device.device_wait_idle() } {
-            log::warn!("Failed to wait device idle before recreating swapchain: {e}");
-        }
+    pub fn write_uniforms(&mut self, frame_index: usize, world: &hecs::World) -> Result<(), error::RenderError> {
+        use crate::propellant::components::*;
 
-        let new_swapchain = vulkan::VkSwapchain::create(vulkan_state, &self.vk_device, window, Some(&self.swapchain))?;
-        self.swapchain = new_swapchain;
-        self.geometry_pass = geometry_pass::GeometryPass::create(&self.vk_device, &self.swapchain)?;
-
-        let image_views = self.swapchain.image_views();
-        self.geometry_pass_targets = image_views
-            .into_iter()
-            .map(|image| {
-                let attachments = [image];
-                render_pass::RenderPassTarget::create(
-                    &self.vk_device,
-                    self.geometry_pass.render_pass(),
-                    &attachments,
-                    self.swapchain.extent(),
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let frame_count = self.swapchain.image_count() as u32;
-        self.graphics_command.recreate_command_buffers(frame_count)?;
+        /* Set the main camera uniforms */
+        match world.query::<(&Transform, &Camera<true>)>().iter().next() {
+            Some((_, (transform, camera))) => {
+                let camera_uniform = uniforms::CameraUniform::from_camera_components(transform, camera);
+                self.camera_uniform.write(&camera_uniform, frame_index);
+            }
+            None => {
+                return Err(error::RenderError::MissingComponent {
+                    component: "Main Camera",
+                })
+            }
+        };
 
         Ok(())
     }
@@ -182,18 +231,22 @@ impl crate::propellant::System for Renderer {
         crate::propellant::UpdateFrequency::PerFrame
     }
 
-    fn update(&mut self, world: &mut hecs::World, _: std::time::Duration) {
-        match self.render(world) {
+    fn update(&mut self, assets: &crate::propellant::assets::AssetManager, world: &mut hecs::World, _: std::time::Duration) {
+        match self.render(assets, world) {
             Ok(_) => {}
-            Err(ash::vk::Result::SUBOPTIMAL_KHR) => {
-                log::info!("Swapchain returned suboptimal KHR, asking for recreation");
+            Err(error::RenderError::Vulkan {
+                error: ash::vk::Result::SUBOPTIMAL_KHR,
+            }) => {
+                log::debug!("Swapchain returned suboptimal KHR, asking for recreation");
                 let event = crate::propellant::EngineEvent::SwapchainRecreationRequest;
                 if let Err(e) = self.event_loop_proxy.send_event(event) {
                     log::warn!("Failed to send swapchain recreation event: {e}");
                 }
             }
-            Err(ash::vk::Result::ERROR_OUT_OF_DATE_KHR) => {
-                log::info!("Swapchain returned out of date KHR, asking for recreation");
+            Err(error::RenderError::Vulkan {
+                error: ash::vk::Result::ERROR_OUT_OF_DATE_KHR,
+            }) => {
+                log::debug!("Swapchain returned out of date KHR, asking for recreation");
                 let event = crate::propellant::EngineEvent::SwapchainRecreationRequest;
                 if let Err(e) = self.event_loop_proxy.send_event(event) {
                     log::warn!("Failed to send swapchain recreation event: {e}");
@@ -203,7 +256,7 @@ impl crate::propellant::System for Renderer {
         }
     }
 
-    fn handle_event(&mut self, event: crate::propellant::SystemEvent) {
+    fn handle_event(&mut self, world: &mut hecs::World, event: crate::propellant::SystemEvent) {
         match event {
             crate::propellant::SystemEvent::SwapchainRecreationRequest { vulkan_state, window } => {
                 match self.recreate(vulkan_state, window) {

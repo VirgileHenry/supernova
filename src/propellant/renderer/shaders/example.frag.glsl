@@ -1,4 +1,4 @@
-#version 450
+#version 460
 
 layout(location = 0) out vec4 outColor;
 
@@ -29,10 +29,9 @@ Ray get_ray(vec2 noramalized_frag_pos) {
     // ray position should be transformed along with the object position
     // TODO: transform with object position
     vec3 ray_position = vec3(0.0, 0.0, -4.0);
-    
+
     return Ray(ray_position, ray_direction);
 }
-
 
 float scene_sdf(vec3 at) {
     // temp for now: sphere at center
@@ -44,25 +43,24 @@ vec3 scene_normal(vec3 at) {
     float h = 0.00001;
     vec2 k = vec2(1.0, -1.0);
     vec3 normal = normalize(
-        k.xyy * scene_sdf( at + k.xyy * h ) + 
-        k.yyx * scene_sdf( at + k.yyx * h ) + 
-        k.yxy * scene_sdf( at + k.yxy * h ) + 
-        k.xxx * scene_sdf( at + k.xxx * h )
-    );
-    
+            k.xyy * scene_sdf(at + k.xyy * h) +
+                k.yyx * scene_sdf(at + k.yyx * h) +
+                k.yxy * scene_sdf(at + k.yxy * h) +
+                k.xxx * scene_sdf(at + k.xxx * h)
+        );
+
     // TODO: switch normal from cam view space back to world space
 
     return normal;
 }
 
 void main() {
-
     outColor = vec4(0.1, 0.1, 0.1, 1.0);
 
     vec2 normalized_frag_pos = vec2(
-        gl_FragCoord.x / 476.0 - 1.0, // hard coded my screen res for now
-        gl_FragCoord.y / 535.0 - 1.0
-    );
+            gl_FragCoord.x / 476.0 - 1.0, // hard coded my screen res for now
+            gl_FragCoord.y / 535.0 - 1.0
+        );
 
     Ray ray = get_ray(normalized_frag_pos);
 
@@ -72,9 +70,9 @@ void main() {
     // how close to the surface we need to be in order to hit.
     // the less the better quality, but the more expensive.
     vec3 eval_point = ray.origin;
-    for(uint i = 0; i < max_iter; i++) {
+    for (uint i = 0; i < max_iter; i++) {
         float scene_sdf = scene_sdf(eval_point);
-        if(scene_sdf < hit_eps) {
+        if (scene_sdf < hit_eps) {
             // it's a hit !
             vec3 normal = scene_normal(eval_point);
             outColor = vec4(normal, 1.0);
@@ -83,4 +81,3 @@ void main() {
         eval_point += ray.direction * scene_sdf;
     }
 }
-

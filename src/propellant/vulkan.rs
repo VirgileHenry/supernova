@@ -1,3 +1,4 @@
+mod buffer;
 mod command_interface;
 mod device;
 mod instance;
@@ -9,6 +10,11 @@ mod swapchain;
 mod synchronization;
 mod utils;
 
+pub use buffer::copy_buffer;
+pub use buffer::BufferView;
+pub use buffer::StagingBuffer;
+pub use buffer::StorageBuffer;
+pub use buffer::UniformBuffer;
 pub use command_interface::CommandInterface;
 pub use command_interface::InRecordingCommandBuffer;
 pub use device::VkDevice;

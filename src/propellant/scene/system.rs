@@ -1,8 +1,13 @@
 pub trait System {
     fn name(&self) -> &'static str;
     fn frequency(&self) -> UpdateFrequency;
-    fn update(&mut self, world: &mut hecs::World, delta_time: std::time::Duration);
-    fn handle_event(&mut self, event: SystemEvent);
+    fn update(
+        &mut self,
+        assets: &crate::propellant::assets::AssetManager,
+        world: &mut hecs::World,
+        delta_time: std::time::Duration,
+    );
+    fn handle_event(&mut self, world: &mut hecs::World, event: SystemEvent);
 }
 
 pub enum UpdateFrequency {
@@ -53,21 +58,26 @@ pub struct SystemWrapper {
 }
 
 impl SystemWrapper {
-    pub fn update(&mut self, world: &mut hecs::World, delta_time: std::time::Duration) {
+    pub fn update(
+        &mut self,
+        assets: &crate::propellant::assets::AssetManager,
+        world: &mut hecs::World,
+        delta_time: std::time::Duration,
+    ) {
         match self.inner.frequency() {
-            UpdateFrequency::PerFrame => self.inner.update(world, delta_time),
+            UpdateFrequency::PerFrame => self.inner.update(assets, world, delta_time),
             UpdateFrequency::Fixed(timestep) => {
                 self.idle_time += delta_time;
                 while self.idle_time >= timestep {
-                    self.inner.update(world, timestep);
+                    self.inner.update(assets, world, timestep);
                     self.idle_time -= timestep;
                 }
             }
         }
     }
 
-    pub fn handle_event(&mut self, event: SystemEvent) {
-        self.inner.handle_event(event);
+    pub fn handle_event(&mut self, world: &mut hecs::World, event: SystemEvent) {
+        self.inner.handle_event(world, event);
     }
 }
 

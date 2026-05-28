@@ -24,22 +24,9 @@ pub struct Sphere {
     pub radius: Float,
 }
 
-impl Sphere {
-    pub fn new(radius: Float) -> Self {
-        Self {
-            offset: Vec3::ZERO,
-            radius,
-        }
-    }
-
-    pub fn at(self, offset: Vec3) -> Self {
-        Self { offset, ..self }
-    }
-}
-
 impl crate::csg::CsgNode for Sphere {
     const OPCODE: u32 = crate::csg::opcodes::SPHERE;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.offset);
         p[3] = self.radius;
@@ -55,23 +42,9 @@ pub struct Cube {
     pub rotation: Quat,
 }
 
-impl Cube {
-    pub fn new(size: Vec3) -> Self {
-        Self {
-            offset: Vec3::ZERO,
-            size,
-            rotation: Quat::IDENTITY,
-        }
-    }
-
-    pub fn at(self, offset: Vec3) -> Self {
-        Self { offset, ..self }
-    }
-}
-
 impl crate::csg::CsgNode for Cube {
     const OPCODE: u32 = crate::csg::opcodes::CUBE;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.offset);
         pack_vec3(&mut p, 3, self.size);
@@ -91,7 +64,7 @@ pub struct Torus {
 
 impl crate::csg::CsgNode for Torus {
     const OPCODE: u32 = crate::csg::opcodes::TORUS;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.offset);
         pack_vec3(&mut p, 3, self.normal);
@@ -112,7 +85,7 @@ pub struct CubeFrame {
 
 impl crate::csg::CsgNode for CubeFrame {
     const OPCODE: u32 = crate::csg::opcodes::CUBE_FRAME;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.offset);
         pack_vec3(&mut p, 3, self.size);
@@ -135,7 +108,7 @@ pub struct Cone {
 
 impl crate::csg::CsgNode for Cone {
     const OPCODE: u32 = crate::csg::opcodes::CONE;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.offset);
         pack_vec3(&mut p, 3, self.pointing_towards);
@@ -155,7 +128,7 @@ pub struct Triangle {
 
 impl crate::csg::CsgNode for Triangle {
     const OPCODE: u32 = crate::csg::opcodes::TRIANGLE;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.a);
         pack_vec3(&mut p, 3, self.b);
@@ -174,7 +147,7 @@ pub struct RegularHexagon {
 
 impl crate::csg::CsgNode for RegularHexagon {
     const OPCODE: u32 = crate::csg::opcodes::REGULAR_HEXAGON;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.offset);
         pack_vec3(&mut p, 3, self.normal);
@@ -193,7 +166,7 @@ pub struct Capsule {
 
 impl crate::csg::CsgNode for Capsule {
     const OPCODE: u32 = crate::csg::opcodes::CAPSULE;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.a);
         pack_vec3(&mut p, 3, self.b);
@@ -210,19 +183,9 @@ pub struct Cylinder {
     pub radius: Float,
 }
 
-impl Cylinder {
-    pub fn new(radius: Float) -> Self {
-        Self {
-            a: Vec3::X,
-            b: Vec3::NEG_X,
-            radius,
-        }
-    }
-}
-
 impl crate::csg::CsgNode for Cylinder {
     const OPCODE: u32 = crate::csg::opcodes::CYLINDER;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.a);
         pack_vec3(&mut p, 3, self.b);
@@ -241,7 +204,7 @@ pub struct Ellipse {
 
 impl crate::csg::CsgNode for Ellipse {
     const OPCODE: u32 = crate::csg::opcodes::ELLIPSE;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.a);
         pack_vec3(&mut p, 3, self.b);
@@ -260,7 +223,7 @@ pub struct Octahedron {
 
 impl crate::csg::CsgNode for Octahedron {
     const OPCODE: u32 = crate::csg::opcodes::OCTAHEDRON;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.offset);
         p[3] = self.size;
@@ -279,7 +242,7 @@ pub struct Pyramid {
 
 impl crate::csg::CsgNode for Pyramid {
     const OPCODE: u32 = crate::csg::opcodes::PYRAMID;
-    fn to_repr(&self) -> crate::csg::repr::CsgNodeRepr {
+    fn to_repr(&self, _: u32) -> crate::csg::repr::CsgNodeRepr {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.offset);
         p[3] = self.size;

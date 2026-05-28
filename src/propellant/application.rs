@@ -4,6 +4,7 @@ pub trait Application: Sized {
         proxy: &crate::propellant::EventLoopProxy,
         event_loop: &winit::event_loop::ActiveEventLoop,
     ) -> Result<Self, crate::ScError>;
+    fn window(&self) -> &winit::window::Window;
     fn tick(&mut self);
     fn handle_window_event(
         &mut self,

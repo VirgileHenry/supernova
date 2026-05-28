@@ -3,6 +3,7 @@
 
 mod application;
 mod assets;
+mod components;
 mod event;
 mod host;
 mod renderer;
@@ -10,6 +11,7 @@ mod scene;
 mod vulkan;
 
 pub use application::Application;
+pub use assets::AssetHandle;
 pub use assets::AssetManager;
 pub use event::EngineEvent;
 pub use host::EngineHost;

@@ -63,6 +63,10 @@ impl VkPhysicalDevice {
         self.handle
     }
 
+    pub fn memory_properties(&self) -> &ash::vk::PhysicalDeviceMemoryProperties {
+        &self.memory_properties
+    }
+
     pub fn queue_family_indices(&self) -> vulkan::QueueFamilyIndices {
         self.queue_family_indices
     }

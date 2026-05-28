@@ -43,6 +43,12 @@ impl VkSynchronization {
         &self.frame_sync[self.current_frame]
     }
 
+    /// Borrow the current frame's sync without advancing.
+    /// Use this to drive a single frame; advance only after submit.
+    pub fn frame_index(&self) -> usize {
+        self.current_frame
+    }
+
     /// Get the sync for a specific image.
     pub fn image(&self, image_index: usize) -> &SwapchainImageSync {
         &self.image_sync[image_index]
