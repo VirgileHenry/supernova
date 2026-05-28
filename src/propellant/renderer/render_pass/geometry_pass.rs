@@ -56,21 +56,10 @@ impl GeometryPass {
             offset: ash::vk::Offset2D { x: 0, y: 0 },
             extent: swapchain_extent,
         }];
-        let viewport_state = ash::vk::PipelineViewportStateCreateInfo {
-            viewport_count: viewports.len() as u32,
-            p_viewports: if viewports.is_empty() {
-                std::ptr::null()
-            } else {
-                viewports.as_ptr()
-            },
-            scissor_count: scissors.len() as u32,
-            p_scissors: if scissors.is_empty() {
-                std::ptr::null()
-            } else {
-                scissors.as_ptr()
-            },
-            ..Default::default()
-        };
+
+        let viewport_state = ash::vk::PipelineViewportStateCreateInfo::default()
+            .viewports(viewports.as_slice())
+            .scissors(scissors.as_slice());
 
         let rasterization_state = ash::vk::PipelineRasterizationStateCreateInfo {
             depth_clamp_enable: ash::vk::FALSE,
@@ -199,27 +188,10 @@ impl GeometryPass {
         let subpasses = [subpass];
         let dependencies = [subpass_dependency];
 
-        let create_info = ash::vk::RenderPassCreateInfo {
-            attachment_count: attachments.len() as u32,
-            p_attachments: if attachments.is_empty() {
-                std::ptr::null()
-            } else {
-                attachments.as_ptr()
-            },
-            subpass_count: subpasses.len() as u32,
-            p_subpasses: if subpasses.is_empty() {
-                std::ptr::null()
-            } else {
-                subpasses.as_ptr()
-            },
-            dependency_count: dependencies.len() as u32,
-            p_dependencies: if dependencies.is_empty() {
-                std::ptr::null()
-            } else {
-                dependencies.as_ptr()
-            },
-            ..Default::default()
-        };
+        let create_info = ash::vk::RenderPassCreateInfo::default()
+            .attachments(attachments.as_slice())
+            .subpasses(subpasses.as_slice())
+            .dependencies(dependencies.as_slice());
 
         Ok(unsafe { vk_device.create_render_pass(&create_info, None)? })
     }
