@@ -4,20 +4,24 @@ use crate::propellant::components::Transform;
 #[repr(C)]
 #[derive(Copy, Clone)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable)]
-pub struct SegmentInstanceUniform {
+pub struct SegmentInstanceData {
     pub transform: [[f32; 4]; 4],
     pub transform_inv: [[f32; 4]; 4],
+    pub aabb_min: [f32; 4],
+    pub aabb_max: [f32; 4],
     pub shell_offset: u32,
     pub shell_length: u32,
     pub interior_offset: u32,
     pub interior_length: u32,
 }
 
-impl SegmentInstanceUniform {
+impl SegmentInstanceData {
     pub fn from_segment_components(transform: &Transform, segment: &crate::propellant::assets::Segment) -> Self {
-        SegmentInstanceUniform {
+        SegmentInstanceData {
             transform: transform.to_matrix().to_cols_array_2d(),
             transform_inv: transform.to_matrix().inverse().to_cols_array_2d(),
+            aabb_min: segment.bounding_box().min().extend(0.0).to_array(),
+            aabb_max: segment.bounding_box().max().extend(0.0).to_array(),
             shell_offset: segment.shell_view().offset() as u32,
             shell_length: segment.shell_view().length() as u32,
             interior_offset: segment.interior_view().offset() as u32,

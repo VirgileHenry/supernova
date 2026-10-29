@@ -3,7 +3,8 @@
 /// `params` is reinterpreted per opcode — see the `encode` impls for the
 /// per-opcode meaning of each slot.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CsgNodeRepr {
     opcode: u32,
     child_count: u32,

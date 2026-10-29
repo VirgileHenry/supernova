@@ -8,7 +8,7 @@ pub trait RenderingPass {
     type Input<'input>;
     type Output<'output>;
     fn render<'input, 'output>(
-        &self,
+        &mut self,
         vk_device: &vulkan::VkDeviceHandle,
         assets: &crate::propellant::assets::AssetManager,
         world: &hecs::World,
@@ -31,7 +31,7 @@ impl RenderPassTarget {
         render_pass: ash::vk::RenderPass,
         attachments: &[ash::vk::ImageView],
         extent: ash::vk::Extent2D,
-    ) -> Result<RenderPassTarget, crate::ScError> {
+    ) -> Result<RenderPassTarget, vulkan::VkError> {
         let framebuffer_create_info = ash::vk::FramebufferCreateInfo {
             render_pass,
             attachment_count: attachments.len() as u32,

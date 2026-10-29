@@ -21,7 +21,7 @@ pub struct VkSynchronization {
 
 impl VkSynchronization {
     pub fn create(vk_device: &vulkan::VkDeviceHandle, swapchain_image_count: usize) -> ash::prelude::VkResult<VkSynchronization> {
-        let frame_sync: Vec<InFlightFrameSync> = (0..vulkan::MAX_FRAMES_IN_FLIGHTS)
+        let frame_sync: Vec<InFlightFrameSync> = (0..vulkan::MAX_FRAMES_IN_FLIGHT)
             .map(|_| InFlightFrameSync::create(vk_device))
             .collect::<Result<_, _>>()?;
 
@@ -71,7 +71,7 @@ impl VkSynchronization {
 
     /// Advance to the next frame slot. Call after submit.
     pub fn advance(&mut self) {
-        self.current_frame = (self.current_frame + 1) % vulkan::MAX_FRAMES_IN_FLIGHTS;
+        self.current_frame = (self.current_frame + 1) % vulkan::MAX_FRAMES_IN_FLIGHT;
     }
 }
 

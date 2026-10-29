@@ -1,11 +1,9 @@
-type SegmentAssetHandle = crate::propellant::AssetHandle<crate::propellant::assets::Segment>;
-
 pub struct SegmentRenderer {
-    segment: SegmentAssetHandle,
+    pub handle: crate::propellant::assets::SegmentHandle,
 }
 
 impl SegmentRenderer {
-    pub fn new(segment: SegmentAssetHandle) -> Self {
-        SegmentRenderer { segment }
+    pub fn new(handle: crate::propellant::assets::SegmentHandle) -> Self {
+        SegmentRenderer { handle }
     }
 }

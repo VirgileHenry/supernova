@@ -30,16 +30,17 @@ impl BufferUsage for Uniform {
 impl TransferSrc for Uniform {}
 
 impl<T: Copy> VkBuffer<Uniform, T> {
-    /// Write data into the staging buffer at the given byte offset.
+    /// Write data into the buffer at the given byte offset.
     ///
     /// Returns whether the write happened or not.
     /// If the function returns false, it's likely the provided data
     /// could not fit in the buffer at the given offset.
     pub fn write(&mut self, data: &T) -> BufferView<T> {
-        unsafe {
-            let bytes_to_write = std::mem::size_of::<T>();
-            std::ptr::copy_nonoverlapping(data as *const T as *const u8, self.usage.mapped.as_ptr(), bytes_to_write);
-        }
+        let src = data as *const T as *const u8;
+        let dst = self.usage.mapped.as_ptr();
+        let bytes_to_write = std::mem::size_of::<T>();
+
+        unsafe { std::ptr::copy_nonoverlapping(src, dst, bytes_to_write) };
 
         BufferView {
             offset: 0,

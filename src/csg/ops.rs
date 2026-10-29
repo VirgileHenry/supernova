@@ -30,6 +30,9 @@ impl crate::csg::CsgNode for Round {
         p[0] = self.radius;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +47,9 @@ impl crate::csg::CsgNode for Extrude {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.extrusion);
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -62,6 +68,9 @@ impl crate::csg::CsgNode for Revolve {
         pack_vec3(&mut p, 4, self.axis_dir); // p[4..7]
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,6 +87,9 @@ impl crate::csg::CsgNode for PlanarSymmetry {
         pack_vec3(&mut p, 0, self.plane_base);
         pack_vec3(&mut p, 4, self.plane_normal);
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -100,6 +112,9 @@ impl crate::csg::CsgNode for AxialSymmetry {
         p[8] = f32::from_bits(self.clone_count);
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -115,6 +130,9 @@ impl crate::csg::CsgNode for Elongate {
         pack_vec3(&mut p, 0, self.elongation);
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -129,6 +147,9 @@ impl crate::csg::CsgNode for Onion {
         let mut p = [0.0; 12];
         p[0] = self.thickness;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -147,6 +168,9 @@ impl crate::csg::CsgNode for Twist {
         p[3] = self.amount; // packed into the 4th slot of the direction vec
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -161,6 +185,9 @@ impl crate::csg::CsgNode for Bend {
         let mut p = [0.0; 12];
         pack_vec3(&mut p, 0, self.curvature_normal);
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -182,6 +209,9 @@ impl crate::csg::CsgNode for Transform {
         pack_quat(&mut p, 6, self.rotation); // p[6..10]
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -192,6 +222,9 @@ impl crate::csg::CsgNode for Union {
     fn to_repr(&self, child_count: u32) -> crate::csg::repr::CsgNodeRepr {
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, [0.0; 12])
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -201,6 +234,9 @@ impl crate::csg::CsgNode for Intersect {
     const OPCODE: u32 = crate::csg::opcodes::INTERSECT;
     fn to_repr(&self, child_count: u32) -> crate::csg::repr::CsgNodeRepr {
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, [0.0; 12])
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -217,6 +253,9 @@ impl crate::csg::CsgNode for SmoothUnion {
         p[0] = self.amount;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -232,6 +271,9 @@ impl crate::csg::CsgNode for SmoothIntersect {
         p[0] = self.amount;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -243,6 +285,9 @@ impl crate::csg::CsgNode for Difference {
         // child_count is always 2 for Difference, but pass it through anyway
         // for consistency with the trait.
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, [0.0; 12])
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -258,5 +303,8 @@ impl crate::csg::CsgNode for SmoothDifference {
         let mut p = [0.0; 12];
         p[0] = self.amount;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, child_count, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }

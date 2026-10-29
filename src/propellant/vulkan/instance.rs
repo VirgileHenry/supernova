@@ -16,7 +16,7 @@ pub struct VkInstance {
 impl VkInstance {
     pub fn create<D: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle>(
         display: &D,
-    ) -> Result<VkInstance, crate::ScError> {
+    ) -> Result<VkInstance, vulkan::VkError> {
         /* Fixme: missing terminal byte everywhere */
         let application_info = ash::vk::ApplicationInfo {
             p_application_name: crate::constants::SUPERNOVA_NAME.as_ptr() as *const i8,
@@ -27,12 +27,16 @@ impl VkInstance {
         };
 
         let entry = unsafe { ash::Entry::load()? };
+        let display_handle = display
+            .display_handle()
+            .map_err(|error| vulkan::VkError::DisplayHande { error })?;
+        let window_handle = display
+            .window_handle()
+            .map_err(|error| vulkan::VkError::WindowHandle { error })?;
 
         /* Get the extensions required by the display */
-        let required_extensions = ash_window::enumerate_required_extensions(display.display_handle().unwrap().into())?
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+        let required_extensions = ash_window::enumerate_required_extensions(display_handle.into())?;
+        let required_extensions = required_extensions.iter().cloned().collect::<Vec<_>>();
 
         /* Get all available layers to check support for the required layers */
         let available_layers = unsafe { entry.enumerate_instance_layer_properties() }?
@@ -84,15 +88,8 @@ impl VkInstance {
 
         log::info!("Successefuly created Vulkan instance");
 
-        let surface = unsafe {
-            ash_window::create_surface(
-                &entry,
-                &instance,
-                display.display_handle().unwrap().into(), // TODO: error handling here
-                display.window_handle().unwrap().into(),  // TODO: error handling here
-                None,
-            )?
-        };
+        let surface =
+            unsafe { ash_window::create_surface(&entry, &instance, display_handle.into(), window_handle.into(), None)? };
 
         let physical_devices = vulkan::physical_devices::query_physical_devices(&instance, surface, &surface_instance)?;
         physical_devices.log_all();
@@ -125,6 +122,11 @@ impl VkInstance {
     /// Fixme: use player prefs to take the user prefered device, and fallback to scoring funcs
     pub fn prefered_physical_device(&self) -> Option<std::sync::Arc<crate::propellant::vulkan::VkPhysicalDevice>> {
         self.physical_devices.usable_physical_devices().first().cloned()
+    }
+
+    /// Get the names of all available physical devices, usable or not
+    pub fn physical_device_names(&self) -> impl Iterator<Item = &str> {
+        self.physical_devices.names()
     }
 }
 

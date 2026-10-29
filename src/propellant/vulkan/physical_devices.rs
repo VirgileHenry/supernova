@@ -157,6 +157,12 @@ impl VkPhysicalDevices {
             log::info!(" - {device} Unusubale: {}", device.reason);
         }
     }
+
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        let usable = self.usable_physical_devices.iter().map(|dev| dev.name.as_str());
+        let unusable = self.unusable_physical_devices().iter().map(|dev| dev.name.as_str());
+        usable.chain(unusable)
+    }
 }
 
 pub fn query_physical_devices(

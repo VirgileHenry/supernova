@@ -1,4 +1,5 @@
 mod error;
+mod instance;
 mod staging;
 mod storage;
 mod uniform;
@@ -7,14 +8,26 @@ mod utils;
 use crate::propellant::vulkan;
 use error::BufferWriteError;
 
-/// Storage buffer type shortcut.
-pub type StorageBuffer<T> = VkBuffer<storage::Storage, T>;
+/// Instance buffer type shortcut.
+pub type InstanceBuffer<T> = VkBuffer<instance::Instance, T>;
 
 /// Staging buffer type shortcut.
 pub type StagingBuffer<T> = VkBuffer<staging::Staging, T>;
 
+/// Storage buffer type shortcut.
+pub type StorageBuffer<T> = VkBuffer<storage::Storage, T>;
+
 /// Uniform buffer type shortcut.
 pub type UniformBuffer<T> = VkBuffer<uniform::Uniform, T>;
+
+/// Ring instance buffer type shortcut.
+pub type RingInstanceBuffer<T, const N: usize> = RingVkBuffer<instance::Instance, T, N>;
+
+/// Ring storage buffer type shortcut.
+pub type RingStorageBuffer<T, const N: usize> = RingVkBuffer<storage::Storage, T, N>;
+
+/// Ring uniform buffer type shortcut.
+pub type RingUniformBuffer<T, const N: usize> = RingVkBuffer<uniform::Uniform, T, N>;
 
 /// Marker trait for different kind of buffers.
 pub trait BufferUsage: Sized {
@@ -49,7 +62,7 @@ pub struct VkBuffer<Usage: BufferUsage, T> {
     /// Backing device memory.
     memory: ash::vk::DeviceMemory,
 
-    /// Size of the buffer in bytes.
+    /// Size of the buffer in number of elements.
     capacity: std::num::NonZeroUsize,
 
     /// Buffer usage, in case the usage struct carries any data, like mapped memory.
@@ -118,11 +131,18 @@ impl<Usage: BufferUsage, T> VkBuffer<Usage, T> {
         })
     }
 
+    pub fn descriptor_info(&self) -> ash::vk::DescriptorBufferInfo {
+        ash::vk::DescriptorBufferInfo::default()
+            .buffer(self.handle)
+            .offset(0)
+            .range(self.byte_capacity() as u64)
+    }
+
     pub fn capacity(&self) -> usize {
         self.capacity.get()
     }
 
-    pub fn size(&self) -> usize {
+    pub fn byte_capacity(&self) -> usize {
         self.capacity() * std::mem::size_of::<T>()
     }
 
@@ -140,6 +160,29 @@ impl<Usage: BufferUsage, T> Drop for VkBuffer<Usage, T> {
         self.usage.destroy(&self.vk_device, self.memory);
         unsafe { self.vk_device.destroy_buffer(self.handle, None) };
         unsafe { self.vk_device.free_memory(self.memory, None) };
+    }
+}
+
+/// Ring buffer for vk buffers
+pub struct RingVkBuffer<Usage: BufferUsage, T, const N: usize> {
+    buffers: [VkBuffer<Usage, T>; N],
+}
+
+impl<Usage: BufferUsage, T, const N: usize> RingVkBuffer<Usage, T, N> {
+    /// Create a new ring buffer with the given initial capacity
+    pub fn create(vk_device: &vulkan::VkDeviceHandle, capacity: std::num::NonZeroUsize) -> ash::prelude::VkResult<Self> {
+        let buffers = crate::utils::try_from_fn(|_| VkBuffer::create(vk_device, capacity))?;
+        Ok(Self { buffers })
+    }
+
+    /// Get access to the buffer at the given index mod N in the ring.
+    pub fn get(&self, index: usize) -> &VkBuffer<Usage, T> {
+        &self.buffers[index % N]
+    }
+
+    /// Get mutable access to the buffer at the given index mod N in the ring.
+    pub fn get_mut(&mut self, index: usize) -> &mut VkBuffer<Usage, T> {
+        &mut self.buffers[index % N]
     }
 }
 

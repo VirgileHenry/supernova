@@ -3,6 +3,7 @@ mod csg;
 mod error;
 mod propellant;
 mod supernova;
+mod utils;
 
 use error::ScError;
 type ScResult<T> = Result<T, ScError>;
@@ -16,8 +17,7 @@ fn main() -> ScResult<()> {
     core_event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let event_loop_proxy = core_event_loop.create_proxy();
 
-    type Host = propellant::EngineHost<supernova::SupernovaApp>;
-    let mut host: Host = propellant::EngineHost::create(event_loop_proxy);
+    let mut host = propellant::EngineHost::<supernova::SupernovaApp>::create(event_loop_proxy);
     core_event_loop.run_app(&mut host)?;
 
     Ok(())

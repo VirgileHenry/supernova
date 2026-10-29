@@ -85,7 +85,10 @@ impl SystemWrapper {
 #[derive(Clone)]
 pub enum SystemEvent<'a> {
     SwapchainRecreationRequest {
-        vulkan_state: &'a crate::propellant::VkInstance,
-        window: &'a winit::window::Window,
+        vk_context: &'a crate::propellant::vulkan::VulkanContext,
+    },
+    WindowResize {
+        width: u32,
+        height: u32,
     },
 }

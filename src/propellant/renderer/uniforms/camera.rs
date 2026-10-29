@@ -1,5 +1,4 @@
-use crate::propellant::components::Camera;
-use crate::propellant::components::Transform;
+use crate::propellant::components;
 
 /// Uniform data to be sent to the GPU for the camera.
 #[repr(C)]
@@ -11,7 +10,10 @@ pub struct CameraUniform {
 }
 
 impl CameraUniform {
-    pub fn from_camera_components<const MAIN: bool>(transform: &Transform, camera: &Camera<MAIN>) -> Self {
+    pub fn from_camera_components<Usage: components::camera::CameraUsage>(
+        transform: &components::Transform,
+        camera: &components::Camera<Usage>,
+    ) -> Self {
         Self {
             view: transform.to_matrix().to_cols_array_2d(),
             proj: camera.projection_matrix().to_cols_array_2d(),

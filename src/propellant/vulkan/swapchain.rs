@@ -1,3 +1,5 @@
+use crate::propellant::vulkan;
+
 mod image;
 
 /// Interface to use the Vulkan swapchain.
@@ -20,12 +22,11 @@ pub struct VkSwapchain {
 }
 
 impl VkSwapchain {
-    pub fn create(
-        vk_instance: &crate::propellant::VkInstance,
-        vk_device: &crate::propellant::vulkan::VkDeviceHandle,
-        window: &winit::window::Window,
-        previous: Option<&Self>,
-    ) -> Result<VkSwapchain, crate::ScError> {
+    pub fn create(vk_context: &vulkan::VulkanContext, previous: Option<&Self>) -> Result<VkSwapchain, vulkan::VkError> {
+        let vk_device = vk_context.device_handle();
+        let vk_instance = vk_context.instance();
+        let window = &vk_context.window;
+
         let indices = vk_device.physical_device().queue_family_indices();
         let surface_support = vk_device.physical_device().surface_support();
         let surface_capabilities = vk_instance.surface_capabilities(vk_device.physical_device())?;
@@ -67,20 +68,20 @@ impl VkSwapchain {
             Some(previous_swapchain) => create_info.old_swapchain(previous_swapchain.swapchain),
         };
 
-        let swapchain_device = ash::khr::swapchain::Device::new(vk_instance, vk_device);
+        let swapchain_device = ash::khr::swapchain::Device::new(vk_instance, &vk_device);
         let swapchain = unsafe { swapchain_device.create_swapchain(&create_info, None)? };
 
         let images = unsafe { swapchain_device.get_swapchain_images(swapchain)? };
 
         let images = images
             .into_iter()
-            .map(|image| image::VkSwapchainImage::create(vk_device, image, surface_format.format))
+            .map(|image| image::VkSwapchainImage::create(&vk_device, image, surface_format.format))
             .collect::<Result<Vec<_>, _>>()?;
 
         log::debug!(
             "Successefuly created renderer swapchain, with {} images and {} max frames in flight",
             images.len(),
-            crate::propellant::vulkan::MAX_FRAMES_IN_FLIGHTS
+            crate::propellant::vulkan::MAX_FRAMES_IN_FLIGHT
         );
 
         Ok(VkSwapchain {

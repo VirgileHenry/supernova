@@ -205,4 +205,47 @@ impl CsgTree {
             }
         }
     }
+
+    pub fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        match self {
+            // Empty
+            CsgTree::Empty => crate::csg::AxisAlignedBoundingBox::ZERO,
+
+            // Primitives push directly.
+            CsgTree::Sphere(primitive) => primitive.bounding_box(),
+            CsgTree::Cube(primitive) => primitive.bounding_box(),
+            CsgTree::Torus(primitive) => primitive.bounding_box(),
+            CsgTree::CubeFrame(primitive) => primitive.bounding_box(),
+            CsgTree::Cone(primitive) => primitive.bounding_box(),
+            CsgTree::Triangle(primitive) => primitive.bounding_box(),
+            CsgTree::RegularHexagon(primitive) => primitive.bounding_box(),
+            CsgTree::Capsule(primitive) => primitive.bounding_box(),
+            CsgTree::Cylinder(primitive) => primitive.bounding_box(),
+            CsgTree::Ellipse(primitive) => primitive.bounding_box(),
+            CsgTree::Octahedron(primitive) => primitive.bounding_box(),
+            CsgTree::Pyramid(primitive) => primitive.bounding_box(),
+
+            // Unary ops: flatten child, then push operator.
+            CsgTree::Round { node, .. } => node.bounding_box(),
+            CsgTree::Extrude { node, .. } => node.bounding_box(),
+            CsgTree::Revolve { node, .. } => node.bounding_box(),
+            CsgTree::PlanarSym { node, .. } => node.bounding_box(),
+            CsgTree::AxialSym { node, .. } => node.bounding_box(),
+            CsgTree::Elongate { node, .. } => node.bounding_box(),
+            CsgTree::Onion { node, .. } => node.bounding_box(),
+            CsgTree::Twist { node, .. } => node.bounding_box(),
+            CsgTree::Bend { node, .. } => node.bounding_box(),
+            CsgTree::Transform { node, .. } => node.bounding_box(),
+
+            // N-ary: flatten all children left-to-right, then push op with count.
+            CsgTree::Union { .. } => crate::csg::AxisAlignedBoundingBox::ZERO,
+            CsgTree::Intersect { .. } => crate::csg::AxisAlignedBoundingBox::ZERO,
+            CsgTree::SmoothUnion { .. } => crate::csg::AxisAlignedBoundingBox::ZERO,
+            CsgTree::SmoothIntersect { .. } => crate::csg::AxisAlignedBoundingBox::ZERO,
+
+            // Binary asymmetric: base first, then subtract.
+            CsgTree::Difference { .. } => crate::csg::AxisAlignedBoundingBox::ZERO,
+            CsgTree::SmoothDifference { .. } => crate::csg::AxisAlignedBoundingBox::ZERO,
+        }
+    }
 }

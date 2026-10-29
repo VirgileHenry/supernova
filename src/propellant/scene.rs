@@ -1,8 +1,11 @@
+mod error;
 mod system;
 
 pub use system::System;
 pub use system::SystemEvent;
 pub use system::UpdateFrequency;
+
+use crate::propellant::vulkan;
 
 /// A Scene is the main container for an ECS and multiple systems.
 pub struct Scene {
@@ -27,20 +30,18 @@ impl Scene {
 
     /// Create the Scene used as the main menu.
     pub fn test_scene(
-        vk_context: &crate::propellant::VkInstance,
-        vk_device: crate::propellant::vulkan::VkDeviceHandle,
-        window: &winit::window::Window,
+        vk_context: &vulkan::VulkanContext,
         event_loop_proxy: crate::propellant::EventLoopProxy,
         assets: &crate::propellant::AssetManager,
-    ) -> Result<Self, crate::ScError> {
+    ) -> Self {
         log::info!("Creating test scene...");
 
         let mut scene = Self::empty("Test Scene".to_string());
 
         /* Add a camera holding entity */
         use crate::propellant::components;
-        let camera = components::Camera::primary(1.0);
-        let cam_transform = components::Transform::IDENTITY.at(glam::vec3(0., 0., 3.));
+        let camera = components::Camera::main(1.0);
+        let cam_transform = components::Transform::IDENTITY.at(glam::vec3(0., 0., 8.));
         scene.world.spawn((camera, cam_transform));
 
         /* Add a single segment entity */
@@ -54,16 +55,14 @@ impl Scene {
         }
 
         /* Standard systems for the menu world */
-        scene.load_system(crate::propellant::renderer::Renderer::create(
-            vk_context,
-            vk_device,
-            window,
-            event_loop_proxy,
-        )?);
+        match crate::propellant::renderer::Renderer::create(vk_context, event_loop_proxy) {
+            Ok(renderer) => scene.load_system(renderer),
+            Err(error) => log::error!("Failed to create renderer for test scene: {error}"),
+        }
 
         // Insert all objects for menu world
 
-        Ok(scene)
+        scene
     }
 
     pub fn send_system_event(&mut self, event: SystemEvent) {

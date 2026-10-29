@@ -1,6 +1,5 @@
 #[derive(Debug)]
 pub enum ScError {
-    VulkanLoading(ash::LoadingError),
     Vulkan(ash::vk::Result),
     Generic(&'static str),
     OsError(winit::error::OsError),
@@ -12,7 +11,6 @@ pub enum ScError {
 impl std::fmt::Display for ScError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ScError::VulkanLoading(error) => write!(f, "VulkanLoading error: {error}"),
             ScError::Vulkan(error) => write!(f, "Vulkan error: {error}"),
             ScError::Generic(error) => write!(f, "Generic error: {error}"),
             ScError::OsError(error) => write!(f, "OsError error: {error}"),
@@ -29,15 +27,6 @@ impl From<ash::vk::Result> for ScError {
         let caller_location = std::panic::Location::caller();
         log::error!("Building vulkan error from failure at {caller_location}");
         ScError::Vulkan(value)
-    }
-}
-
-impl From<ash::LoadingError> for ScError {
-    #[track_caller]
-    fn from(value: ash::LoadingError) -> Self {
-        let caller_location = std::panic::Location::caller();
-        log::error!("Building vulkan loading error from failure at {caller_location}");
-        ScError::VulkanLoading(value)
     }
 }
 

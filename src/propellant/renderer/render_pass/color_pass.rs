@@ -6,7 +6,7 @@ impl super::RenderingPass for ColorPass {
     type Input<'input> = ();
     type Output<'output> = ();
     fn render<'input, 'output>(
-        &self,
+        &mut self,
         vk_device: &vulkan::VkDeviceHandle,
         assets: &crate::propellant::assets::AssetManager,
         world: &hecs::World,

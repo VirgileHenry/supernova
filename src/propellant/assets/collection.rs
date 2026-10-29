@@ -78,4 +78,9 @@ impl<T: assets::Asset> AssetCollection<T> {
         let id = self.lookup.get(name)?;
         Some(assets::AssetHandle::new(*id))
     }
+
+    /// Attempt to get an asset in the collection by its name.
+    pub fn get_asset_from_handle(&self, handle: &assets::AssetHandle<T>) -> Option<&T> {
+        self.assets.get(handle.id)
+    }
 }

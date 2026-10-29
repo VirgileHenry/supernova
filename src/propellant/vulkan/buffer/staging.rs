@@ -32,9 +32,8 @@ impl TransferSrc for Staging {}
 impl<T: Copy> VkBuffer<Staging, T> {
     /// Write data into the staging buffer at the given byte offset.
     ///
-    /// Returns whether the write happened or not.
-    /// If the function returns false, it's likely the provided data
-    /// could not fit in the buffer at the given offset.
+    /// On success, returns a view to the written data.
+    /// On failure, returns an error with the data overflow values.
     pub fn write(&mut self, offset: usize, data: &[T]) -> Result<BufferView<T>, BufferWriteError> {
         if offset + data.len() <= self.capacity.get() {
             let bytes_to_write = data.len() * std::mem::size_of::<T>();

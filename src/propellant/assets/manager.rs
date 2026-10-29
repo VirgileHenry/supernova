@@ -1,4 +1,7 @@
+mod error;
+
 use crate::propellant::assets;
+pub use error::AssetLoadError;
 
 pub struct AssetManager {
     /// Handle to the Vulkan device.
@@ -13,7 +16,7 @@ pub struct AssetManager {
 
 impl AssetManager {
     /// Load all the required game assets from a given directory.
-    pub fn load(vk_device: crate::propellant::vulkan::VkDeviceHandle, asset_directory: &str) -> crate::ScResult<Self> {
+    pub fn load(vk_device: crate::propellant::vulkan::VkDeviceHandle, asset_directory: &str) -> Result<Self, AssetLoadError> {
         log::info!("Loading assets from \"./{asset_directory}\"");
 
         let segments_directory = format!("{asset_directory}/segments");
@@ -23,7 +26,7 @@ impl AssetManager {
         log::info!(
             "Loaded {} assets in the \"segments\" collection, {} bytes on the GPU",
             segments.count(),
-            segment_buffer.buffer_size(),
+            segment_buffer.byte_count(),
         );
 
         Ok(Self {
@@ -34,7 +37,7 @@ impl AssetManager {
         })
     }
 
-    pub fn reload_all(&mut self) -> crate::ScResult<()> {
+    pub fn reload_all(&mut self) -> Result<(), AssetLoadError> {
         log::info!("Reloading assets from \"./{}\"", self.asset_directory);
 
         let segments_directory = format!("{}/segments", self.asset_directory);
@@ -43,7 +46,7 @@ impl AssetManager {
         log::info!(
             "Reloaded {} assets in the \"segments\" collection, {} bytes on the GPU",
             new_segments.count(),
-            new_segment_buffer.buffer_size(),
+            new_segment_buffer.byte_count(),
         );
 
         self.segments = new_segments;
@@ -53,7 +56,12 @@ impl AssetManager {
     }
 
     /// Attempt to get an asset segment by its name.
-    pub fn get_segment_handle(&self, segment_name: &str) -> Option<assets::AssetHandle<assets::Segment>> {
+    pub fn get_segment_handle(&self, segment_name: &str) -> Option<assets::SegmentHandle> {
         self.segments.get_handle_from_name(segment_name)
+    }
+
+    /// Attempt to get a segment from it's handle.
+    pub fn get_segment(&self, segment_handle: &assets::SegmentHandle) -> Option<&assets::Segment> {
+        self.segments.get_asset_from_handle(segment_handle)
     }
 }

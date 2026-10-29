@@ -1,16 +1,12 @@
 /// Generic trait for applications that the engine can run.
 pub trait Application: Sized {
-    fn create(
-        proxy: &crate::propellant::EventLoopProxy,
-        event_loop: &winit::event_loop::ActiveEventLoop,
-    ) -> Result<Self, crate::ScError>;
-    fn window(&self) -> &winit::window::Window;
-    fn tick(&mut self);
-    fn handle_window_event(
-        &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
-        window_id: winit::window::WindowId,
-        event: winit::event::WindowEvent,
-    );
-    fn handle_engine_event(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, event: crate::propellant::EngineEvent);
+    /// Create a new instance of the application from the event loop and its proxy.
+    fn create() -> Self;
+
+    /// Application tick, called before engine ticks and runs all the systems.
+    /// Entry point of user code.
+    fn tick(&mut self, delta_time: std::time::Duration);
+
+    /// Called when the engine is going to shutdown
+    fn shutdown(&mut self);
 }

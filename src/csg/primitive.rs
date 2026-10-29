@@ -32,6 +32,12 @@ impl crate::csg::CsgNode for Sphere {
         p[3] = self.radius;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        crate::csg::AxisAlignedBoundingBox {
+            min: self.offset - self.radius,
+            max: self.offset + self.radius,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +56,9 @@ impl crate::csg::CsgNode for Cube {
         pack_vec3(&mut p, 3, self.size);
         pack_quat(&mut p, 6, self.rotation);
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -71,6 +80,9 @@ impl crate::csg::CsgNode for Torus {
         p[6] = self.inner_radius;
         p[7] = self.outer_radius;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -95,6 +107,9 @@ impl crate::csg::CsgNode for CubeFrame {
         p[10] = self.thickness;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +131,9 @@ impl crate::csg::CsgNode for Cone {
         p[7] = self.base_radius;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -134,6 +152,9 @@ impl crate::csg::CsgNode for Triangle {
         pack_vec3(&mut p, 3, self.b);
         pack_vec3(&mut p, 6, self.c);
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -154,6 +175,9 @@ impl crate::csg::CsgNode for RegularHexagon {
         p[6] = self.radius;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -172,6 +196,9 @@ impl crate::csg::CsgNode for Capsule {
         pack_vec3(&mut p, 3, self.b);
         p[6] = self.radius;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -192,6 +219,13 @@ impl crate::csg::CsgNode for Cylinder {
         p[6] = self.radius;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        /* Fixme: not the tightest bounds for a cylinder */
+        crate::csg::AxisAlignedBoundingBox {
+            min: self.a.min(self.b) - self.radius,
+            max: self.a.max(self.b) + self.radius,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -210,6 +244,9 @@ impl crate::csg::CsgNode for Ellipse {
         pack_vec3(&mut p, 3, self.b);
         p[6] = self.radius;
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
 
@@ -230,6 +267,9 @@ impl crate::csg::CsgNode for Octahedron {
         pack_quat(&mut p, 4, self.rotation);
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
     }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -248,5 +288,8 @@ impl crate::csg::CsgNode for Pyramid {
         p[3] = self.size;
         pack_quat(&mut p, 4, self.rotation);
         crate::csg::repr::CsgNodeRepr::new(Self::OPCODE, 0, p)
+    }
+    fn bounding_box(&self) -> crate::csg::AxisAlignedBoundingBox {
+        unimplemented!()
     }
 }
