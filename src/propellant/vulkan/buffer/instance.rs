@@ -36,8 +36,10 @@ impl<T: Copy> VkBuffer<Instance, T> {
     /// If the function returns false, it's likely the provided data
     /// could not fit in the buffer at the given offset.
     pub fn write(&mut self, index: usize, data: &T) -> BufferView<T> {
-        let src = unsafe { (data as *const T).add(index) as *const u8 };
-        let dst = self.usage.mapped.as_ptr();
+        let offset = index * std::mem::size_of::<T>();
+
+        let src = data as *const T as *const u8;
+        let dst = unsafe { self.usage.mapped.as_ptr().add(offset) };
         let bytes_to_write = std::mem::size_of::<T>();
 
         unsafe { std::ptr::copy_nonoverlapping(src, dst, bytes_to_write) };

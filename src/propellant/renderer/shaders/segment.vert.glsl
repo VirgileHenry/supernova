@@ -97,6 +97,8 @@ void main() {
     const int indices[6] = int[](0, 1, 2, 2, 1, 3);
 
     vec2 quad_pos = quad_corners[indices[gl_VertexIndex]];
+
+    out_instance_index = gl_InstanceIndex;
     out_ndc = quad_pos;
 
     // Directly output NDC XY as clip-space XY.

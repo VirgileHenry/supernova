@@ -51,6 +51,12 @@ impl Scene {
                 let segment_component = components::SegmentRenderer::new(segment);
                 let segment_transform = components::Transform::IDENTITY;
                 scene.world.spawn((segment_component, segment_transform));
+                let segment_component = components::SegmentRenderer::new(segment);
+                let segment_transform = components::Transform::IDENTITY.at(glam::vec3(2.0, 1.0, 0.0));
+                scene.world.spawn((segment_component, segment_transform));
+                let segment_component = components::SegmentRenderer::new(segment);
+                let segment_transform = components::Transform::IDENTITY.at(glam::vec3(1.0, 0.0, 2.0));
+                scene.world.spawn((segment_component, segment_transform));
             }
             None => log::warn!("Failed to load objects for test scene: missing asset \"tube_small\""),
         }
