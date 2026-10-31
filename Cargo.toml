@@ -1,23 +1,15 @@
-[package]
-name = "supernova"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "3"
+members = ["application", "propellant"]
 
-[dependencies]
-ash = "0.38.0"
-ash-window = "0.13.0"
-bytemuck = "1.25.0"
+[workspace.package]
+version = "0.0.1"
+description = "Behind the supernova: survival and space exploration game"
+authors = ["Virgile HENRY"]
+
+[workspace.dependencies]
+application = { path = "application" }
+propellant = { path = "propellant" }
+
 env_logger = "0.11.5"
-glam = { version = "0.32.1", features = ["serde"] }
-hecs = "0.10.5"
 log = "0.4.22"
-raw-window-handle = "0.6.2"
-ron = "0.12.1"
-serde = { version = "1.0.228", features = ["derive"] }
-softbuffer = "0.4.6"
-vk-shader-macros = "0.2.10"
-winit = "0.30.13"
-
-[features]
-default = []
-perf-measurements = []
