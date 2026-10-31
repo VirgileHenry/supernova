@@ -15,7 +15,7 @@ impl CameraUniform {
         camera: &components::Camera<Usage>,
     ) -> Self {
         Self {
-            view: transform.to_matrix().to_cols_array_2d(),
+            view: transform.to_matrix().inverse().to_cols_array_2d(),
             proj: camera.projection_matrix().to_cols_array_2d(),
         }
     }

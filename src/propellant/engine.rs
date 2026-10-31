@@ -79,6 +79,7 @@ impl<App: crate::propellant::Application> Engine<App> {
                 use crate::propellant::SystemEvent;
                 self.scene.send_system_event(SystemEvent::SwapchainRecreationRequest {
                     vk_context: &self.vk_context,
+                    assets: &self.assets,
                 });
                 self.scene.send_system_event(SystemEvent::WindowResize {
                     width: new_size.width,
@@ -98,6 +99,7 @@ impl<App: crate::propellant::Application> Engine<App> {
             crate::propellant::EngineEvent::SwapchainRecreationRequest => {
                 let event = crate::propellant::SystemEvent::SwapchainRecreationRequest {
                     vk_context: &self.vk_context,
+                    assets: &self.assets,
                 };
                 self.scene.send_system_event(event)
             }

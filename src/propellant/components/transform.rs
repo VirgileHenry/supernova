@@ -20,12 +20,30 @@ impl Transform {
         }
     }
 
+    /// Update the transform rotation to look at the given point, using Y as up.
+    pub fn look_at(self, point: glam::Vec3) -> Self {
+        let view_rotation_inv = glam::Quat::look_at_rh(self.position, point, glam::Vec3::Y);
+        /* Fixme: need more details here, but since this is a tranform, the look at is made for cams, and we need to inverse it? */
+        let view_rotation = view_rotation_inv.inverse();
+
+        Self {
+            position: self.position,
+            rotation: view_rotation,
+            scale: self.scale,
+        }
+    }
+
     pub fn rotated(self, rotation: glam::Quat) -> Self {
         Self {
             position: self.position,
             rotation,
             scale: self.scale,
         }
+    }
+
+    pub fn rotate_around(&mut self, axis: glam::Vec3, angle: f32) {
+        let rotation = glam::Quat::from_axis_angle(axis, angle);
+        self.rotation *= rotation;
     }
 
     pub fn scaled(self, scale: glam::Vec3) -> Self {

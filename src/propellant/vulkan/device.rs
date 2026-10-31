@@ -140,6 +140,7 @@ impl std::fmt::Debug for VkDevice {
 
 impl Drop for VkDevice {
     fn drop(&mut self) {
+        log::info!("Destroying vulkan device");
         if let Err(e) = unsafe { self.device.device_wait_idle() } {
             log::warn!("Failed to wait device idle for cleanup: {e}");
         }

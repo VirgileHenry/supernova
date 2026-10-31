@@ -130,4 +130,8 @@ impl SegmentGpuAllocation {
     pub fn byte_count(&self) -> usize {
         self.buffer.byte_capacity()
     }
+
+    pub fn buffer(&self) -> &vulkan::StorageBuffer<crate::csg::CsgNodeRepr> {
+        &self.buffer
+    }
 }

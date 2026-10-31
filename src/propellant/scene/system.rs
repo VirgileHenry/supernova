@@ -81,11 +81,19 @@ impl SystemWrapper {
     }
 }
 
+impl std::ops::Deref for SystemWrapper {
+    type Target = dyn System;
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
+    }
+}
+
 /// Events that are sent to systems.
 #[derive(Clone)]
 pub enum SystemEvent<'a> {
     SwapchainRecreationRequest {
         vk_context: &'a crate::propellant::vulkan::VulkanContext,
+        assets: &'a crate::propellant::AssetManager,
     },
     WindowResize {
         width: u32,

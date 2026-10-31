@@ -139,6 +139,7 @@ impl std::ops::Deref for VkInstance {
 
 impl Drop for VkInstance {
     fn drop(&mut self) {
+        log::info!("Destroying vulkan instance");
         unsafe {
             self.surface_instance.destroy_surface(self.surface, None);
             self.instance.destroy_instance(None);

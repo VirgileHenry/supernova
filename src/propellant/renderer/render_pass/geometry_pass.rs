@@ -39,7 +39,11 @@ pub struct GeometryPass {
 }
 
 impl GeometryPass {
-    pub fn create(vk_device: &vulkan::VkDeviceHandle, swapchain: &vulkan::VkSwapchain) -> Result<GeometryPass, vulkan::VkError> {
+    pub fn create(
+        vk_device: &vulkan::VkDeviceHandle,
+        swapchain: &vulkan::VkSwapchain,
+        assets: &crate::propellant::AssetManager,
+    ) -> Result<GeometryPass, vulkan::VkError> {
         /* Fixme: PLEASE refactor me */
 
         const VERTEX_SHADER: shaders::ShaderSource = shaders::SEGMENT_VERT;
@@ -110,12 +114,17 @@ impl GeometryPass {
                 .binding(0)
                 .descriptor_type(ash::vk::DescriptorType::UNIFORM_BUFFER)
                 .descriptor_count(1)
-                .stage_flags(ash::vk::ShaderStageFlags::VERTEX),
+                .stage_flags(ash::vk::ShaderStageFlags::VERTEX | ash::vk::ShaderStageFlags::FRAGMENT),
             ash::vk::DescriptorSetLayoutBinding::default()
                 .binding(1)
                 .descriptor_type(ash::vk::DescriptorType::STORAGE_BUFFER)
                 .descriptor_count(1)
-                .stage_flags(ash::vk::ShaderStageFlags::VERTEX),
+                .stage_flags(ash::vk::ShaderStageFlags::VERTEX | ash::vk::ShaderStageFlags::FRAGMENT),
+            ash::vk::DescriptorSetLayoutBinding::default()
+                .binding(2)
+                .descriptor_type(ash::vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(ash::vk::ShaderStageFlags::FRAGMENT),
         ];
 
         let descriptor_set_layout_info = ash::vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
@@ -155,13 +164,16 @@ impl GeometryPass {
         let instance_buffer_capacity = std::num::NonZeroUsize::new(128).unwrap();
         let instance_buffer = vulkan::RingInstanceBuffer::create(&vk_device, instance_buffer_capacity)?;
 
+        let uniform_buffer_descriptor_count: u32 = vulkan::MAX_FRAMES_IN_FLIGHT as u32;
+        let storage_buffer_descriptor_count: u32 = vulkan::MAX_FRAMES_IN_FLIGHT as u32 * 2;
+
         let pool_sizes = [
             ash::vk::DescriptorPoolSize::default()
                 .ty(ash::vk::DescriptorType::UNIFORM_BUFFER)
-                .descriptor_count(vulkan::MAX_FRAMES_IN_FLIGHT as u32),
+                .descriptor_count(uniform_buffer_descriptor_count),
             ash::vk::DescriptorPoolSize::default()
                 .ty(ash::vk::DescriptorType::STORAGE_BUFFER)
-                .descriptor_count(vulkan::MAX_FRAMES_IN_FLIGHT as u32),
+                .descriptor_count(storage_buffer_descriptor_count),
         ];
 
         let pool_info = ash::vk::DescriptorPoolCreateInfo::default()
@@ -185,9 +197,11 @@ impl GeometryPass {
         for frame_index in 0..vulkan::MAX_FRAMES_IN_FLIGHT {
             let camera_info = camera_uniform.get(frame_index).descriptor_info();
             let instance_info = instance_buffer.get(frame_index).descriptor_info();
+            let csg_info = assets.segment_buffer().buffer().descriptor_info();
 
             let camera_infos = [camera_info];
             let instance_infos = [instance_info];
+            let csg_infos = [csg_info];
 
             let writes = [
                 ash::vk::WriteDescriptorSet::default()
@@ -200,6 +214,11 @@ impl GeometryPass {
                     .dst_binding(1)
                     .descriptor_type(ash::vk::DescriptorType::STORAGE_BUFFER)
                     .buffer_info(&instance_infos),
+                ash::vk::WriteDescriptorSet::default()
+                    .dst_set(descriptor_sets[frame_index])
+                    .dst_binding(2)
+                    .descriptor_type(ash::vk::DescriptorType::STORAGE_BUFFER)
+                    .buffer_info(&csg_infos),
             ];
 
             unsafe { vk_device.update_descriptor_sets(&writes, &[]) }
@@ -320,7 +339,7 @@ impl super::RenderingPass for GeometryPass {
         let mut instance_count = 0;
 
         let mut query = world.query::<(&Transform, &SegmentRenderer)>();
-        for (entity, (transform, segment_renderer)) in query.iter() {
+        for (_entity, (transform, segment_renderer)) in query.iter() {
             /* Fixme: maybe the segment component could store the bounding sphere + views to avoid the asset fetch ? */
             let Some(segment) = assets.get_segment(&segment_renderer.handle) else {
                 log::warn!(

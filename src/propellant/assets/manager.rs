@@ -64,4 +64,8 @@ impl AssetManager {
     pub fn get_segment(&self, segment_handle: &assets::SegmentHandle) -> Option<&assets::Segment> {
         self.segments.get_asset_from_handle(segment_handle)
     }
+
+    pub fn segment_buffer(&self) -> &assets::segment::SegmentGpuAllocation {
+        &self.segment_buffer
+    }
 }

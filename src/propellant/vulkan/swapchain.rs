@@ -191,6 +191,7 @@ impl VkSwapchain {
 
 impl Drop for VkSwapchain {
     fn drop(&mut self) {
+        log::debug!("Destroying swapchain");
         unsafe {
             self.images.iter_mut().for_each(|iv| iv.destroy(&self.vk_device));
             self.swapchain_device.destroy_swapchain(self.swapchain, None);

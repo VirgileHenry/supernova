@@ -49,7 +49,10 @@ impl<Usage: CameraUsage> Camera<Usage> {
     }
 
     pub fn projection_matrix(&self) -> glam::Mat4 {
-        glam::Mat4::perspective_rh(self.fov_y_radians, self.aspect_ratio, self.z_near, self.z_far)
+        let mut proj = glam::Mat4::perspective_rh(self.fov_y_radians, self.aspect_ratio, self.z_near, self.z_far);
+        /* Vulkan uses +Y downwards, but perspective_rh creates a +Y upwards. this flips it. */
+        proj.y_axis.y = -proj.y_axis.y;
+        proj
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {

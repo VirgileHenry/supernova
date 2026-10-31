@@ -38,15 +38,14 @@ impl Renderer {
     pub fn create(
         vk_context: &vulkan::VulkanContext,
         event_loop_proxy: crate::propellant::EventLoopProxy,
+        assets: &crate::propellant::AssetManager,
     ) -> Result<Renderer, vulkan::VkError> {
         let vk_device_handle = vk_context.device_handle();
-
-        log::info!("Creating renderer...");
 
         let swapchain = vulkan::VkSwapchain::create(vk_context, None)?;
         let synchronization = vulkan::VkSynchronization::create(&vk_device_handle, swapchain.image_count())?;
 
-        let geometry_pass = geometry_pass::GeometryPass::create(&vk_device_handle, &swapchain)?;
+        let geometry_pass = geometry_pass::GeometryPass::create(&vk_device_handle, &swapchain, assets)?;
 
         let image_views = swapchain.image_views();
         let geometry_pass_targets = image_views
@@ -66,6 +65,8 @@ impl Renderer {
         let graphics_queue = vk_device_handle.graphics_queue();
         let graphics_command = vulkan::CommandInterface::create(&vk_device_handle, graphics_queue, frame_count)?;
 
+        log::info!("Created renderer");
+
         Ok(Renderer {
             event_loop_proxy,
             vk_device_handle,
@@ -79,14 +80,18 @@ impl Renderer {
         })
     }
 
-    pub fn recreate(&mut self, vk_context: &vulkan::VulkanContext) -> Result<(), vulkan::VkError> {
+    pub fn recreate(
+        &mut self,
+        vk_context: &vulkan::VulkanContext,
+        assets: &crate::propellant::AssetManager,
+    ) -> Result<(), vulkan::VkError> {
         if let Err(e) = unsafe { self.vk_device_handle.device_wait_idle() } {
             log::warn!("Failed to wait device idle before recreating swapchain: {e}");
         }
 
         let new_swapchain = vulkan::VkSwapchain::create(vk_context, Some(&self.swapchain))?;
         self.swapchain = new_swapchain;
-        self.geometry_pass = geometry_pass::GeometryPass::create(&self.vk_device_handle, &self.swapchain)?;
+        self.geometry_pass = geometry_pass::GeometryPass::create(&self.vk_device_handle, &self.swapchain, assets)?;
 
         let image_views = self.swapchain.image_views();
         self.geometry_pass_targets = image_views
@@ -235,10 +240,12 @@ impl crate::propellant::System for Renderer {
 
     fn handle_event(&mut self, world: &mut hecs::World, event: crate::propellant::SystemEvent) {
         match event {
-            crate::propellant::SystemEvent::SwapchainRecreationRequest { vk_context } => match self.recreate(vk_context) {
-                Ok(_) => {}
-                Err(e) => log::warn!("Failed to recreate swapchain: {e}"),
-            },
+            crate::propellant::SystemEvent::SwapchainRecreationRequest { vk_context, assets } => {
+                match self.recreate(vk_context, assets) {
+                    Ok(_) => {}
+                    Err(e) => log::warn!("Failed to recreate swapchain: {e}"),
+                }
+            }
             crate::propellant::SystemEvent::WindowResize { width, height } => {
                 use crate::propellant::components;
                 let mut query = world.query::<&mut components::Camera<components::camera::MainCamera>>();
@@ -252,6 +259,7 @@ impl crate::propellant::System for Renderer {
 
 impl Drop for Renderer {
     fn drop(&mut self) {
+        log::info!("Destroying renderer");
         if let Err(e) = unsafe { self.vk_device_handle.device_wait_idle() } {
             log::warn!("Failed to wait device idle for cleanup: {e}");
         }

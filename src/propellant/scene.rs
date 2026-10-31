@@ -21,6 +21,7 @@ impl Scene {
     /// Create a new, fully empty Scene.
     /// This is usefull if we want a placeholder, inactive value.
     fn empty(name: String) -> Self {
+        log::info!("Created new scene: \"{name}\"");
         Self {
             name,
             world: hecs::World::new(),
@@ -34,14 +35,14 @@ impl Scene {
         event_loop_proxy: crate::propellant::EventLoopProxy,
         assets: &crate::propellant::AssetManager,
     ) -> Self {
-        log::info!("Creating test scene...");
-
         let mut scene = Self::empty("Test Scene".to_string());
 
         /* Add a camera holding entity */
         use crate::propellant::components;
         let camera = components::Camera::main(1.0);
-        let cam_transform = components::Transform::IDENTITY.at(glam::vec3(0., 0., 8.));
+        let cam_transform = components::Transform::IDENTITY
+            .at(glam::vec3(0., 2., 8.))
+            .look_at(glam::Vec3::ZERO);
         scene.world.spawn((camera, cam_transform));
 
         /* Add a single segment entity */
@@ -55,10 +56,13 @@ impl Scene {
         }
 
         /* Standard systems for the menu world */
-        match crate::propellant::renderer::Renderer::create(vk_context, event_loop_proxy) {
+        match crate::propellant::renderer::Renderer::create(vk_context, event_loop_proxy, assets) {
             Ok(renderer) => scene.load_system(renderer),
             Err(error) => log::error!("Failed to create renderer for test scene: {error}"),
         }
+
+        /* Fixme: little spinner as I implement raymarching */
+        scene.load_system(Spinner { speed: 0.5 });
 
         // Insert all objects for menu world
 
@@ -79,6 +83,31 @@ impl Scene {
     pub fn update(&mut self, assets: &crate::propellant::assets::AssetManager, delta_time: std::time::Duration) {
         for system in self.systems.iter_mut() {
             system.update(assets, &mut self.world, delta_time);
+        }
+    }
+}
+
+/// Fixme: delete, for the test
+struct Spinner {
+    speed: f32,
+}
+
+impl System for Spinner {
+    fn name(&self) -> &'static str {
+        "Spinner"
+    }
+
+    fn frequency(&self) -> UpdateFrequency {
+        UpdateFrequency::PerFrame
+    }
+
+    fn handle_event(&mut self, _: &mut hecs::World, _: SystemEvent) {}
+
+    fn update(&mut self, _: &crate::propellant::assets::AssetManager, world: &mut hecs::World, delta_time: std::time::Duration) {
+        use crate::propellant::components;
+
+        for (_, (transform, _)) in world.query_mut::<(&mut components::Transform, &components::SegmentRenderer)>() {
+            transform.rotate_around(glam::Vec3::Y, self.speed * delta_time.as_secs_f32());
         }
     }
 }

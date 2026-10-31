@@ -31,9 +31,16 @@ layout(set = 0, binding = 1, std430) readonly buffer InstanceBuffer {
     SegmentInstance instances[];
 };
 
+// Pass the instance index to the fragment shader
+layout(location = 0) flat out uint out_instance_index;
+// Pass the ndc to the fragment shader
+layout(location = 1) out vec2 out_ndc;
+
 vec2 corner_to_ndc(SegmentInstance instance, vec3 corner) {
     vec4 local_pos = vec4(corner, 1.0);
-    vec4 clip_pos = camera.proj * camera.view * instance.transform * local_pos;
+    vec4 world_pos = instance.transform * local_pos;
+    vec4 cam_view_pos = camera.view * world_pos;
+    vec4 clip_pos = camera.proj * cam_view_pos;
 
     // Perspective divide: clip space -> NDC.
     vec2 ndc = clip_pos.xy / clip_pos.w;
@@ -51,6 +58,8 @@ void main() {
     // the gl_InstanceIndex tells which instance data to use.
 
     SegmentInstance instance = instances[gl_InstanceIndex];
+
+    vec2 debug_ndc = corner_to_ndc(instance, vec3(0.0));
 
     // The 8 corners of the local-space AABB.
     vec3 corners[8] = vec3[](
@@ -88,6 +97,7 @@ void main() {
     const int indices[6] = int[](0, 1, 2, 2, 1, 3);
 
     vec2 quad_pos = quad_corners[indices[gl_VertexIndex]];
+    out_ndc = quad_pos;
 
     // Directly output NDC XY as clip-space XY.
     // Z is a temporary placeholder.
