@@ -1,4 +1,4 @@
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 type SegmentBufferView = vulkan::BufferView<crate::csg::CsgNodeRepr>;
 
@@ -35,7 +35,7 @@ impl Segment {
     }
 }
 
-impl crate::propellant::assets::Asset for Segment {
+impl crate::assets::Asset for Segment {
     const ASSET_KIND: &'static str = "Segment";
 
     fn name(&self) -> &str {

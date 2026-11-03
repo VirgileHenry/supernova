@@ -1,4 +1,4 @@
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 pub struct CommandInterface {
     /// Handle to the vulkan device to use the vulkan API.

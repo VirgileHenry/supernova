@@ -382,6 +382,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
+name = "csg"
+version = "0.0.1"
+dependencies = [
+ "bytemuck",
+ "glam",
+ "serde",
+]
+
+[[package]]
 name = "ctor"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1358,6 +1367,21 @@ dependencies = [
 [[package]]
 name = "propellant"
 version = "0.0.1"
+dependencies = [
+ "ash",
+ "ash-window",
+ "bytemuck",
+ "env_logger",
+ "glam",
+ "hecs",
+ "log",
+ "raw-window-handle",
+ "ron",
+ "serde",
+ "softbuffer",
+ "vk-shader-macros",
+ "winit",
+]
 
 [[package]]
 name = "quick-xml"
@@ -1726,19 +1750,11 @@ checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
 name = "supernova"
 version = "0.1.0"
 dependencies = [
- "ash",
- "ash-window",
- "bytemuck",
+ "csg",
  "env_logger",
  "glam",
- "hecs",
  "log",
- "raw-window-handle",
- "ron",
- "serde",
- "softbuffer",
- "vk-shader-macros",
- "winit",
+ "propellant",
 ]
 
 [[package]]

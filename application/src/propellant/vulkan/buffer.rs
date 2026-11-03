@@ -5,7 +5,7 @@ mod storage;
 mod uniform;
 mod utils;
 
-use crate::propellant::vulkan;
+use crate::vulkan;
 use error::BufferWriteError;
 
 /// Instance buffer type shortcut.

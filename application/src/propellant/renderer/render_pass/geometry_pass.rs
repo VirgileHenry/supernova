@@ -1,6 +1,6 @@
-use crate::propellant::renderer::shaders;
-use crate::propellant::renderer::uniforms;
-use crate::propellant::vulkan;
+use crate::renderer::shaders;
+use crate::renderer::uniforms;
+use crate::vulkan;
 
 pub struct GeometryPassInput {
     /// Index of the current in flight frame.
@@ -42,7 +42,7 @@ impl GeometryPass {
     pub fn create(
         vk_device: &vulkan::VkDeviceHandle,
         swapchain: &vulkan::VkSwapchain,
-        assets: &crate::propellant::AssetManager,
+        assets: &crate::assets::AssetManager,
     ) -> Result<GeometryPass, vulkan::VkError> {
         /* Fixme: PLEASE refactor me */
 
@@ -286,19 +286,19 @@ impl GeometryPass {
     }
 }
 
-impl super::RenderingPass for GeometryPass {
+impl super::RenderPass for GeometryPass {
     type Input<'input> = GeometryPassInput;
     type Output<'output> = GeometryPassOutput<'output>;
 
     fn render<'input, 'output>(
         &mut self,
         vk_device: &vulkan::VkDeviceHandle,
-        assets: &crate::propellant::assets::AssetManager,
+        assets: &crate::assets::AssetManager,
         world: &hecs::World,
         input: &Self::Input<'input>,
         out: &mut Self::Output<'output>,
     ) -> ash::prelude::VkResult<()> {
-        use crate::propellant::components::*;
+        use crate::components::*;
 
         let mut camera_query = world.query::<(&Transform, &Camera<camera::MainCamera>)>();
         let Some((_, (transform, camera))) = camera_query.iter().next() else {

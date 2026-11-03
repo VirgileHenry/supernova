@@ -3,7 +3,7 @@
 ///
 /// Returns None if no such memory type exists on this device.
 pub fn find_memory_type(
-    physical_device: &crate::propellant::vulkan::VkPhysicalDevice,
+    physical_device: &crate::vulkan::VkPhysicalDevice,
     type_bits: u32,
     required_properties: ash::vk::MemoryPropertyFlags,
 ) -> Option<u32> {

@@ -1,4 +1,4 @@
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 const VULKAN_VALIDATION_LAYERS: &std::ffi::CStr =
     unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"VK_LAYER_KHRONOS_validation\0") };
@@ -10,7 +10,7 @@ pub struct VkInstance {
     instance: ash::Instance,
     surface: ash::vk::SurfaceKHR,
     surface_instance: ash::khr::surface::Instance,
-    physical_devices: crate::propellant::vulkan::VkPhysicalDevices,
+    physical_devices: crate::vulkan::VkPhysicalDevices,
 }
 
 impl VkInstance {
@@ -22,7 +22,7 @@ impl VkInstance {
             p_application_name: crate::constants::SUPERNOVA_NAME.as_ptr() as *const i8,
             application_version: crate::constants::SUPERNOVA_VERSION,
             p_engine_name: crate::constants::SUPERNOVA_ENGINE_NAME.as_ptr() as *const i8,
-            api_version: crate::propellant::vulkan::VULKAN_API_VERSION,
+            api_version: crate::vulkan::VULKAN_API_VERSION,
             ..Default::default()
         };
 
@@ -120,7 +120,7 @@ impl VkInstance {
     /// Get the prefered physical device to run the engine on.
     ///
     /// Fixme: use player prefs to take the user prefered device, and fallback to scoring funcs
-    pub fn prefered_physical_device(&self) -> Option<std::sync::Arc<crate::propellant::vulkan::VkPhysicalDevice>> {
+    pub fn prefered_physical_device(&self) -> Option<std::sync::Arc<crate::vulkan::VkPhysicalDevice>> {
         self.physical_devices.usable_physical_devices().first().cloned()
     }
 

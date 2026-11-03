@@ -5,7 +5,7 @@ pub use requirements::required_device_extensions;
 pub use requirements::required_device_features;
 pub use surface_support::SurfaceSupport;
 
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 /// Cached info about a vulkan physical device.
 ///

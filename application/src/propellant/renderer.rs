@@ -3,7 +3,7 @@ mod render_pass;
 mod shaders;
 mod uniforms;
 
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 use render_pass::color_pass;
 use render_pass::geometry_pass;
@@ -11,7 +11,7 @@ use render_pass::post_processing_pass;
 
 pub struct Renderer {
     /// Reference to the event loop proxy to send messages to the engine.
-    event_loop_proxy: crate::propellant::EventLoopProxy,
+    event_loop_proxy: crate::EventLoopProxy,
 
     /// Handle to the vulkan device to use the vulkan API.
     vk_device_handle: vulkan::VkDeviceHandle,
@@ -37,8 +37,8 @@ pub struct Renderer {
 impl Renderer {
     pub fn create(
         vk_context: &vulkan::VulkanContext,
-        event_loop_proxy: crate::propellant::EventLoopProxy,
-        assets: &crate::propellant::AssetManager,
+        event_loop_proxy: crate::EventLoopProxy,
+        assets: &crate::assets::AssetManager,
     ) -> Result<Renderer, vulkan::VkError> {
         let vk_device_handle = vk_context.device_handle();
 
@@ -83,7 +83,7 @@ impl Renderer {
     pub fn recreate(
         &mut self,
         vk_context: &vulkan::VulkanContext,
-        assets: &crate::propellant::AssetManager,
+        assets: &crate::assets::AssetManager,
     ) -> Result<(), vulkan::VkError> {
         if let Err(e) = unsafe { self.vk_device_handle.device_wait_idle() } {
             log::warn!("Failed to wait device idle before recreating swapchain: {e}");
@@ -113,11 +113,7 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn render(
-        &mut self,
-        assets: &crate::propellant::assets::AssetManager,
-        world: &hecs::World,
-    ) -> Result<(), error::RenderError> {
+    pub fn render(&mut self, assets: &crate::assets::AssetManager, world: &hecs::World) -> Result<(), error::RenderError> {
         /* Wait for the frame slot to be usable,  */
         self.synchronization.frame().wait_until_available()?;
 
@@ -145,7 +141,7 @@ impl Renderer {
             },
         };
 
-        use render_pass::RenderingPass;
+        use render_pass::RenderPass;
         let geometry_pass_result = self.geometry_pass.render(
             &self.vk_device_handle,
             assets,
@@ -204,23 +200,23 @@ impl Renderer {
     }
 }
 
-impl crate::propellant::System for Renderer {
+impl crate::System for Renderer {
     fn name(&self) -> &'static str {
         "Renderer"
     }
 
-    fn frequency(&self) -> crate::propellant::UpdateFrequency {
-        crate::propellant::UpdateFrequency::PerFrame
+    fn frequency(&self) -> crate::UpdateFrequency {
+        crate::UpdateFrequency::PerFrame
     }
 
-    fn update(&mut self, assets: &crate::propellant::assets::AssetManager, world: &mut hecs::World, _: std::time::Duration) {
+    fn update(&mut self, assets: &crate::assets::AssetManager, world: &mut hecs::World, _: std::time::Duration) {
         match self.render(assets, world) {
             Ok(_) => {}
             Err(error::RenderError::Vulkan {
                 error: ash::vk::Result::SUBOPTIMAL_KHR,
             }) => {
                 log::debug!("Swapchain returned suboptimal KHR, asking for recreation");
-                let event = crate::propellant::EngineEvent::SwapchainRecreationRequest;
+                let event = crate::EngineEvent::SwapchainRecreationRequest;
                 if let Err(e) = self.event_loop_proxy.send_event(event) {
                     log::warn!("Failed to send swapchain recreation event: {e}");
                 }
@@ -229,7 +225,7 @@ impl crate::propellant::System for Renderer {
                 error: ash::vk::Result::ERROR_OUT_OF_DATE_KHR,
             }) => {
                 log::debug!("Swapchain returned out of date KHR, asking for recreation");
-                let event = crate::propellant::EngineEvent::SwapchainRecreationRequest;
+                let event = crate::EngineEvent::SwapchainRecreationRequest;
                 if let Err(e) = self.event_loop_proxy.send_event(event) {
                     log::warn!("Failed to send swapchain recreation event: {e}");
                 }
@@ -238,16 +234,14 @@ impl crate::propellant::System for Renderer {
         }
     }
 
-    fn handle_event(&mut self, world: &mut hecs::World, event: crate::propellant::SystemEvent) {
+    fn handle_event(&mut self, world: &mut hecs::World, event: crate::SystemEvent) {
         match event {
-            crate::propellant::SystemEvent::SwapchainRecreationRequest { vk_context, assets } => {
-                match self.recreate(vk_context, assets) {
-                    Ok(_) => {}
-                    Err(e) => log::warn!("Failed to recreate swapchain: {e}"),
-                }
-            }
-            crate::propellant::SystemEvent::WindowResize { width, height } => {
-                use crate::propellant::components;
+            crate::SystemEvent::SwapchainRecreationRequest { vk_context, assets } => match self.recreate(vk_context, assets) {
+                Ok(_) => {}
+                Err(e) => log::warn!("Failed to recreate swapchain: {e}"),
+            },
+            crate::SystemEvent::WindowResize { width, height } => {
+                use crate::components;
                 let mut query = world.query::<&mut components::Camera<components::camera::MainCamera>>();
                 for (_, main_camera) in query.iter() {
                     main_camera.resize(width, height);

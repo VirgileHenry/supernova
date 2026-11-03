@@ -1,11 +1,11 @@
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 mod image;
 
 /// Interface to use the Vulkan swapchain.
 pub struct VkSwapchain {
     /// Reference to the Vulkan device.
-    vk_device: crate::propellant::vulkan::VkDeviceHandle,
+    vk_device: crate::vulkan::VkDeviceHandle,
 
     /// Vulkan swapchain device
     swapchain_device: ash::khr::swapchain::Device,
@@ -81,7 +81,7 @@ impl VkSwapchain {
         log::debug!(
             "Successefuly created renderer swapchain, with {} images and {} max frames in flight",
             images.len(),
-            crate::propellant::vulkan::MAX_FRAMES_IN_FLIGHT
+            crate::vulkan::MAX_FRAMES_IN_FLIGHT
         );
 
         Ok(VkSwapchain {

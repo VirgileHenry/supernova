@@ -1,0 +1,11 @@
+[package]
+name = "csg"
+edition = "2024"
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+
+[dependencies]
+bytemuck = { workspace = true }
+glam = { workspace = true }
+serde = { workspace = true }

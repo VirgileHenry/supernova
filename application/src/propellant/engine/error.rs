@@ -1,5 +1,5 @@
-use crate::propellant::assets;
-use crate::propellant::vulkan;
+use crate::assets;
+use crate::vulkan;
 
 #[derive(Debug)]
 pub enum EngineCreateError {

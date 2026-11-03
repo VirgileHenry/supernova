@@ -1,0 +1,7 @@
+pub type EventLoopProxy = winit::event_loop::EventLoopProxy<EngineEvent>;
+
+/// All the events that can be thrown by anyone, and to be catch by the main app
+#[derive(Debug)]
+pub enum EngineEvent {
+    SwapchainRecreationRequest,
+}

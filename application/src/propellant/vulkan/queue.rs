@@ -34,7 +34,7 @@ impl std::ops::Deref for VkQueue {
 #[derive(Debug, Clone)]
 pub enum VkSharableQueue {
     Owned(VkQueue),
-    Shared(crate::propellant::vulkan::VkRef<VkQueue>),
+    Shared(crate::vulkan::VkRef<VkQueue>),
 }
 
 impl VkSharableQueue {

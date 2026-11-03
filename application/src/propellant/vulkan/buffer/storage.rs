@@ -1,5 +1,5 @@
-use crate::propellant::vulkan;
-use crate::propellant::vulkan::buffer::*;
+use crate::vulkan;
+use crate::vulkan::buffer::*;
 
 /// Marker struct for storage buffers.
 pub struct Storage;

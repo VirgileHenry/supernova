@@ -1,4 +1,4 @@
-use crate::propellant::assets;
+use crate::assets;
 
 pub struct AssetCollection<T: assets::Asset> {
     assets: Vec<T>,

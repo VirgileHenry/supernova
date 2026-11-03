@@ -1,9 +1,9 @@
 pub struct SegmentRenderer {
-    pub handle: crate::propellant::assets::SegmentHandle,
+    pub handle: crate::assets::SegmentHandle,
 }
 
 impl SegmentRenderer {
-    pub fn new(handle: crate::propellant::assets::SegmentHandle) -> Self {
+    pub fn new(handle: crate::assets::SegmentHandle) -> Self {
         SegmentRenderer { handle }
     }
 }

@@ -1,4 +1,4 @@
-use crate::propellant::components;
+use crate::components;
 
 /// Uniform data to be sent to the GPU for the camera.
 #[repr(C)]

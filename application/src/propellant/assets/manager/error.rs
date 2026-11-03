@@ -1,7 +1,7 @@
 #[derive(Debug)]
 pub enum AssetLoadError {
     Io(std::io::Error),
-    Vulkan(crate::propellant::vulkan::VkError),
+    Vulkan(crate::vulkan::VkError),
 }
 
 impl std::fmt::Display for AssetLoadError {
@@ -21,8 +21,8 @@ impl From<std::io::Error> for AssetLoadError {
     }
 }
 
-impl From<crate::propellant::vulkan::VkError> for AssetLoadError {
-    fn from(error: crate::propellant::vulkan::VkError) -> Self {
+impl From<crate::vulkan::VkError> for AssetLoadError {
+    fn from(error: crate::vulkan::VkError) -> Self {
         Self::Vulkan(error)
     }
 }

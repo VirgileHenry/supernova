@@ -1,11 +1,11 @@
-pub type EventLoopProxy = winit::event_loop::EventLoopProxy<crate::propellant::event::EngineEvent>;
+pub type EventLoopProxy = winit::event_loop::EventLoopProxy<crate::event::EngineEvent>;
 
-pub struct EngineHost<App: crate::propellant::Application> {
+pub struct EngineHost<App: crate::Application> {
     event_loop_proxy: EventLoopProxy,
-    engine: Option<crate::propellant::Engine<App>>,
+    engine: Option<crate::Engine<App>>,
 }
 
-impl<App: crate::propellant::Application> EngineHost<App> {
+impl<App: crate::Application> EngineHost<App> {
     pub fn create(event_loop_proxy: EventLoopProxy) -> Self {
         EngineHost {
             event_loop_proxy,
@@ -13,19 +13,14 @@ impl<App: crate::propellant::Application> EngineHost<App> {
         }
     }
 
-    fn init(
-        &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
-    ) -> Result<(), crate::propellant::engine::EngineCreateError> {
-        let engine = crate::propellant::Engine::create(&self.event_loop_proxy, event_loop)?;
+    fn init(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) -> Result<(), crate::engine::EngineCreateError> {
+        let engine = crate::Engine::create(&self.event_loop_proxy, event_loop)?;
         self.engine = Some(engine);
         Ok(())
     }
 }
 
-impl<App: crate::propellant::Application> winit::application::ApplicationHandler<crate::propellant::EngineEvent>
-    for EngineHost<App>
-{
+impl<App: crate::Application> winit::application::ApplicationHandler<crate::EngineEvent> for EngineHost<App> {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         match self.engine.as_ref() {
             None => {
@@ -52,7 +47,7 @@ impl<App: crate::propellant::Application> winit::application::ApplicationHandler
         }
     }
 
-    fn user_event(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, event: crate::propellant::EngineEvent) {
+    fn user_event(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, event: crate::EngineEvent) {
         match self.engine.as_mut() {
             Some(application) => application.handle_engine_event(event_loop, event),
             None => log::warn!("Unable to handle window event: application not loaded!"),

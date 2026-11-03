@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["application", "propellant"]
+members = ["application", "csg", "propellant"]
 
 [workspace.package]
 version = "0.0.1"
@@ -9,7 +9,11 @@ authors = ["Virgile HENRY"]
 
 [workspace.dependencies]
 application = { path = "application" }
+csg = { path = "csg" }
 propellant = { path = "propellant" }
 
+bytemuck = "1.25.0"
 env_logger = "0.11.5"
+glam = { version = "0.32.1", features = ["serde"] }
 log = "0.4.22"
+serde = { version = "1.0.228", features = ["derive"] }

@@ -1,14 +1,14 @@
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 pub struct PostProcessingPass;
 
-impl super::RenderingPass for PostProcessingPass {
+impl super::RenderPass for PostProcessingPass {
     type Input<'input> = ();
     type Output<'output> = ();
     fn render<'input, 'output>(
         &mut self,
         vk_device: &vulkan::VkDeviceHandle,
-        assets: &crate::propellant::assets::AssetManager,
+        assets: &crate::assets::AssetManager,
         world: &hecs::World,
         input: &Self::Input<'input>,
         out: &mut Self::Output<'output>,

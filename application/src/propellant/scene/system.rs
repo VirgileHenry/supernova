@@ -1,12 +1,7 @@
 pub trait System {
     fn name(&self) -> &'static str;
     fn frequency(&self) -> UpdateFrequency;
-    fn update(
-        &mut self,
-        assets: &crate::propellant::assets::AssetManager,
-        world: &mut hecs::World,
-        delta_time: std::time::Duration,
-    );
+    fn update(&mut self, assets: &crate::assets::AssetManager, world: &mut hecs::World, delta_time: std::time::Duration);
     fn handle_event(&mut self, world: &mut hecs::World, event: SystemEvent);
 }
 
@@ -58,12 +53,7 @@ pub struct SystemWrapper {
 }
 
 impl SystemWrapper {
-    pub fn update(
-        &mut self,
-        assets: &crate::propellant::assets::AssetManager,
-        world: &mut hecs::World,
-        delta_time: std::time::Duration,
-    ) {
+    pub fn update(&mut self, assets: &crate::assets::AssetManager, world: &mut hecs::World, delta_time: std::time::Duration) {
         match self.inner.frequency() {
             UpdateFrequency::PerFrame => self.inner.update(assets, world, delta_time),
             UpdateFrequency::Fixed(timestep) => {
@@ -92,8 +82,8 @@ impl std::ops::Deref for SystemWrapper {
 #[derive(Clone)]
 pub enum SystemEvent<'a> {
     SwapchainRecreationRequest {
-        vk_context: &'a crate::propellant::vulkan::VulkanContext,
-        assets: &'a crate::propellant::AssetManager,
+        vk_context: &'a crate::vulkan::VulkanContext,
+        assets: &'a crate::assets::AssetManager,
     },
     WindowResize {
         width: u32,

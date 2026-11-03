@@ -1,4 +1,4 @@
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 /// Wrapper around an image swapchain.
 pub struct VkSwapchainImage {
@@ -8,7 +8,7 @@ pub struct VkSwapchainImage {
 
 impl VkSwapchainImage {
     pub fn create(
-        vk_device: &crate::propellant::vulkan::VkDeviceHandle,
+        vk_device: &crate::vulkan::VkDeviceHandle,
         image: ash::vk::Image,
         format: ash::vk::Format,
     ) -> Result<VkSwapchainImage, vulkan::VkError> {

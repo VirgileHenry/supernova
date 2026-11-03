@@ -5,7 +5,7 @@ pub use system::System;
 pub use system::SystemEvent;
 pub use system::UpdateFrequency;
 
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 /// A Scene is the main container for an ECS and multiple systems.
 pub struct Scene {
@@ -32,13 +32,13 @@ impl Scene {
     /// Create the Scene used as the main menu.
     pub fn test_scene(
         vk_context: &vulkan::VulkanContext,
-        event_loop_proxy: crate::propellant::EventLoopProxy,
-        assets: &crate::propellant::AssetManager,
+        event_loop_proxy: crate::EventLoopProxy,
+        assets: &crate::assets::AssetManager,
     ) -> Self {
         let mut scene = Self::empty("Test Scene".to_string());
 
         /* Add a camera holding entity */
-        use crate::propellant::components;
+        use crate::components;
         let camera = components::Camera::main(1.0);
         let cam_transform = components::Transform::IDENTITY
             .at(glam::vec3(0., 2., 8.))
@@ -62,7 +62,7 @@ impl Scene {
         }
 
         /* Standard systems for the menu world */
-        match crate::propellant::renderer::Renderer::create(vk_context, event_loop_proxy, assets) {
+        match crate::renderer::Renderer::create(vk_context, event_loop_proxy, assets) {
             Ok(renderer) => scene.load_system(renderer),
             Err(error) => log::error!("Failed to create renderer for test scene: {error}"),
         }
@@ -86,7 +86,7 @@ impl Scene {
         self.systems.add(system);
     }
 
-    pub fn update(&mut self, assets: &crate::propellant::assets::AssetManager, delta_time: std::time::Duration) {
+    pub fn update(&mut self, assets: &crate::assets::AssetManager, delta_time: std::time::Duration) {
         for system in self.systems.iter_mut() {
             system.update(assets, &mut self.world, delta_time);
         }
@@ -109,8 +109,8 @@ impl System for Spinner {
 
     fn handle_event(&mut self, _: &mut hecs::World, _: SystemEvent) {}
 
-    fn update(&mut self, _: &crate::propellant::assets::AssetManager, world: &mut hecs::World, delta_time: std::time::Duration) {
-        use crate::propellant::components;
+    fn update(&mut self, _: &crate::assets::AssetManager, world: &mut hecs::World, delta_time: std::time::Duration) {
+        use crate::components;
 
         for (_, (transform, _)) in world.query_mut::<(&mut components::Transform, &components::SegmentRenderer)>() {
             transform.rotate_around(glam::Vec3::Y, self.speed * delta_time.as_secs_f32());

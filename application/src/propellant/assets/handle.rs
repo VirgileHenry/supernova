@@ -1,4 +1,4 @@
-use crate::propellant::assets;
+use crate::assets;
 
 #[derive(PartialEq, Eq)]
 pub struct AssetHandle<T: assets::Asset> {

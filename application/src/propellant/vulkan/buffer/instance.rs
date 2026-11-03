@@ -1,5 +1,5 @@
-use crate::propellant::vulkan;
-use crate::propellant::vulkan::buffer::*;
+use crate::vulkan;
+use crate::vulkan::buffer::*;
 
 /// Marker struct for instance buffers, host visible and coherent storage buffers.
 pub struct Instance {

@@ -94,7 +94,7 @@ pub fn physical_device_features_check(
 }
 
 pub fn physical_device_extensions_check(extensions: &std::collections::BTreeSet<String>) -> bool {
-    use crate::propellant::vulkan::utils::vulkan_name_to_string;
+    use crate::vulkan::utils::vulkan_name_to_string;
     let mut required_extensions = required_device_extensions().iter().map(|&required| {
         /* SAFETY: converting &[u8] to &[i8], that's fine */
         let bytes: &[i8] = unsafe { std::mem::transmute(required.to_bytes()) };

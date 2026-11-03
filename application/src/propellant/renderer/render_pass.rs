@@ -1,16 +1,16 @@
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 pub mod color_pass;
 pub mod geometry_pass;
 pub mod post_processing_pass;
 
-pub trait RenderingPass {
+pub trait RenderPass {
     type Input<'input>;
     type Output<'output>;
     fn render<'input, 'output>(
         &mut self,
         vk_device: &vulkan::VkDeviceHandle,
-        assets: &crate::propellant::assets::AssetManager,
+        assets: &crate::assets::AssetManager,
         world: &hecs::World,
         input: &Self::Input<'input>,
         out: &mut Self::Output<'output>,
@@ -27,7 +27,7 @@ pub struct RenderPassTarget {
 
 impl RenderPassTarget {
     pub fn create(
-        vk_device: &crate::propellant::vulkan::VkDeviceHandle,
+        vk_device: &crate::vulkan::VkDeviceHandle,
         render_pass: ash::vk::RenderPass,
         attachments: &[ash::vk::ImageView],
         extent: ash::vk::Extent2D,

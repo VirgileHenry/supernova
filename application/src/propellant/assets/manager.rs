@@ -1,11 +1,11 @@
 mod error;
 
-use crate::propellant::assets;
+use crate::assets;
 pub use error::AssetLoadError;
 
 pub struct AssetManager {
     /// Handle to the Vulkan device.
-    vk_device: crate::propellant::vulkan::VkDeviceHandle,
+    vk_device: crate::vulkan::VkDeviceHandle,
 
     /// Keep track of the asset directory
     asset_directory: String,
@@ -16,7 +16,7 @@ pub struct AssetManager {
 
 impl AssetManager {
     /// Load all the required game assets from a given directory.
-    pub fn load(vk_device: crate::propellant::vulkan::VkDeviceHandle, asset_directory: &str) -> Result<Self, AssetLoadError> {
+    pub fn load(vk_device: crate::vulkan::VkDeviceHandle, asset_directory: &str) -> Result<Self, AssetLoadError> {
         log::info!("Loading assets from \"./{asset_directory}\"");
 
         let segments_directory = format!("{asset_directory}/segments");

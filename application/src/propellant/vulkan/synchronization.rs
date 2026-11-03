@@ -1,4 +1,4 @@
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 /// Synchronization primitives for the renderer.
 pub struct VkSynchronization {

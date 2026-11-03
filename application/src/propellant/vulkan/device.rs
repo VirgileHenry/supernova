@@ -1,4 +1,4 @@
-use crate::propellant::vulkan;
+use crate::vulkan;
 
 /// Shared handle to the Vulkan device.
 ///

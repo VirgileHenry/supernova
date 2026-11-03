@@ -2,25 +2,25 @@ mod error;
 
 pub use error::EngineCreateError;
 
-pub struct Engine<App: crate::propellant::Application> {
+pub struct Engine<App: crate::Application> {
     /// User application hosted by the engine
     application: App,
 
     /// Scene manager
-    scene: crate::propellant::Scene, /* Fixme: better scene management */
+    scene: crate::Scene, /* Fixme: better scene management */
     /// Asset manager
-    assets: crate::propellant::AssetManager,
+    assets: crate::assets::AssetManager,
     /// Access to the graphics stack of the engine
     /// WARNING: this shall be dropped after the scene and assets
-    vk_context: crate::propellant::vulkan::VulkanContext,
+    vk_context: crate::vulkan::VulkanContext,
 
     /// Instant of the last update to keep track of delta times
     last_update: std::time::Instant,
 }
 
-impl<App: crate::propellant::Application> Engine<App> {
+impl<App: crate::Application> Engine<App> {
     pub fn create(
-        proxy: &crate::propellant::EventLoopProxy,
+        proxy: &crate::EventLoopProxy,
         event_loop: &winit::event_loop::ActiveEventLoop,
     ) -> Result<Self, EngineCreateError> {
         // TODO: load player preferences as very first task
@@ -35,17 +35,17 @@ impl<App: crate::propellant::Application> Engine<App> {
         // this will directly display an image and present it to the window, opening it up.
         // loading_screen.display_image();
 
-        let vk_context = crate::propellant::vulkan::VulkanContext::create(window)?;
+        let vk_context = crate::vulkan::VulkanContext::create(window)?;
 
         /* Load the assets up */
-        let assets = crate::propellant::AssetManager::load(vk_context.device_handle(), "assets")?;
+        let assets = crate::assets::AssetManager::load(vk_context.device_handle(), "assets")?;
 
         // loading screen is no longer required, as main resources are created and we can proceed with main loop and let the engine manage
         // drop(loading_screen);
 
         // load start scene
         // Fixme: that's not the main menu, need loading scene to load the game up
-        let scene = crate::propellant::Scene::test_scene(&vk_context, proxy.clone(), &assets);
+        let scene = crate::Scene::test_scene(&vk_context, proxy.clone(), &assets);
 
         let application = App::create();
 
@@ -76,7 +76,7 @@ impl<App: crate::propellant::Application> Engine<App> {
                 self.scene.update(&self.assets, delta_time);
             }
             winit::event::WindowEvent::Resized(new_size) => {
-                use crate::propellant::SystemEvent;
+                use crate::SystemEvent;
                 self.scene.send_system_event(SystemEvent::SwapchainRecreationRequest {
                     vk_context: &self.vk_context,
                     assets: &self.assets,
@@ -90,14 +90,10 @@ impl<App: crate::propellant::Application> Engine<App> {
         }
     }
 
-    pub fn handle_engine_event(
-        &mut self,
-        _event_loop: &winit::event_loop::ActiveEventLoop,
-        event: crate::propellant::EngineEvent,
-    ) {
+    pub fn handle_engine_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: crate::EngineEvent) {
         match event {
-            crate::propellant::EngineEvent::SwapchainRecreationRequest => {
-                let event = crate::propellant::SystemEvent::SwapchainRecreationRequest {
+            crate::EngineEvent::SwapchainRecreationRequest => {
+                let event = crate::SystemEvent::SwapchainRecreationRequest {
                     vk_context: &self.vk_context,
                     assets: &self.assets,
                 };

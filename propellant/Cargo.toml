@@ -6,3 +6,16 @@ description.workspace = true
 authors.workspace = true
 
 [dependencies]
+ash = "0.38.0"
+ash-window = "0.13.0"
+bytemuck = { workspace = true }
+env_logger = { workspace = true }
+glam = { workspace = true }
+hecs = "0.10.5"
+log = { workspace = true }
+raw-window-handle = "0.6.2"
+ron = "0.12.1"
+serde = { workspace = true }
+softbuffer = "0.4.6"
+vk-shader-macros = "0.2.10"
+winit = "0.30.13"

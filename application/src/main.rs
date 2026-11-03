@@ -1,7 +1,8 @@
+mod assets;
+mod components;
 mod constants;
-mod csg;
 mod error;
-mod propellant;
+mod renderer;
 mod supernova;
 mod utils;
 

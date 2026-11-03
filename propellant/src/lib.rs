@@ -1,14 +1,18 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Propellant is the engine running this game.
+//! It's currently using the hecs ECS.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod application;
+pub mod assets;
+pub mod components;
+pub mod engine;
+pub mod event;
+pub mod host;
+pub mod renderer;
+pub mod scene;
+pub mod utils;
+pub mod version;
+pub mod vulkan;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use vk_shader_macros::include_glsl;
+
+const ENGINE_NAME: &'static std::ffi::CStr = c"Propellant";

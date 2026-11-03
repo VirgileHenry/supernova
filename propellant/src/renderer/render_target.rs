@@ -1,0 +1,43 @@
+#[derive(Debug, Clone)]
+pub struct RenderTarget {
+    /// Handle to the vulkan device to use the vulkan API.
+    vk_device: crate::vulkan::VkDeviceHandle,
+    /// Target framebuffer to write to.
+    framebuffer: ash::vk::Framebuffer,
+}
+
+impl RenderTarget {
+    pub fn create(
+        vk_device: &crate::vulkan::VkDeviceHandle,
+        render_pass: ash::vk::RenderPass,
+        attachments: &[ash::vk::ImageView],
+        extent: ash::vk::Extent2D,
+    ) -> Result<RenderTarget, crate::vulkan::VkError> {
+        let framebuffer_create_info = ash::vk::FramebufferCreateInfo {
+            render_pass,
+            attachment_count: attachments.len() as u32,
+            p_attachments: if attachments.is_empty() {
+                std::ptr::null()
+            } else {
+                attachments.as_ptr()
+            },
+            width: extent.width,
+            height: extent.height,
+            layers: 1, // TODO
+            ..Default::default()
+        };
+
+        let framebuffer = unsafe { vk_device.create_framebuffer(&framebuffer_create_info, None)? };
+
+        Ok(RenderTarget {
+            vk_device: vk_device.clone(),
+            framebuffer,
+        })
+    }
+}
+
+impl Drop for RenderTarget {
+    fn drop(&mut self) {
+        unsafe { self.vk_device.destroy_framebuffer(self.framebuffer, None) }
+    }
+}
