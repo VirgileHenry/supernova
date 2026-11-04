@@ -12,12 +12,13 @@ impl<T: assets::Asset> AssetCollection<T> {
     /// and attempt to load that file as a .ron file for T.
     pub fn load<P: AsRef<std::path::Path>>(collection_directory: P) -> std::io::Result<Self> {
         let mut assets = Vec::new();
+        let directory_display = collection_directory.as_ref().to_string_lossy();
 
-        for entry in std::fs::read_dir(collection_directory)? {
+        for entry in std::fs::read_dir(&collection_directory)? {
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(e) => {
-                    log::warn!("Failed to read directory entry in {collection_directory}: {e}");
+                    log::warn!("Failed to read directory entry in {directory_display}: {e}");
                     continue;
                 }
             };
@@ -86,4 +87,15 @@ impl<T: assets::Asset> AssetCollection<T> {
     }
 }
 
+impl<T: assets::Asset> Default for AssetCollection<T> {
+    fn default() -> Self {
+        Self {
+            assets: Vec::new(),
+            lookup: std::collections::HashMap::new(),
+        }
+    }
+}
+
 pub trait AssetCollectionImpl: std::any::Any {}
+
+impl<T: assets::Asset + 'static> AssetCollectionImpl for AssetCollection<T> {}

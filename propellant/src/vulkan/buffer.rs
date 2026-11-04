@@ -131,7 +131,7 @@ impl<Usage: BufferUsage, T: bytemuck::Pod + bytemuck::Zeroable> VkBuffer<Usage, 
         })
     }
 
-    pub(crate) fn descriptor_info(&self) -> ash::vk::DescriptorBufferInfo {
+    pub fn descriptor_info(&self) -> ash::vk::DescriptorBufferInfo {
         ash::vk::DescriptorBufferInfo::default()
             .buffer(self.handle)
             .offset(0)

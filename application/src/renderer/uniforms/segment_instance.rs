@@ -1,5 +1,3 @@
-use crate::components::Transform;
-
 /// Uniform for a single segment instance to render.
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -16,7 +14,7 @@ pub struct SegmentInstanceData {
 }
 
 impl SegmentInstanceData {
-    pub fn from_segment_components(transform: &Transform, segment: &crate::assets::Segment) -> Self {
+    pub fn from_segment_components(transform: &propellant::components::Transform, segment: &crate::assets::Segment) -> Self {
         SegmentInstanceData {
             transform: transform.to_matrix().to_cols_array_2d(),
             transform_inv: transform.to_matrix().inverse().to_cols_array_2d(),

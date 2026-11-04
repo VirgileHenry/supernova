@@ -20,16 +20,18 @@ impl AssetManager {
     ) -> Result<Self, AssetLoadError> {
         Ok(Self {
             vk_device: vk_device.clone(),
-            asset_directory: asset_directory.into(),
+            asset_directory: asset_directory.as_ref().to_path_buf(),
             collections: std::collections::HashMap::new(),
         })
     }
 
     pub fn load<T: assets::Asset, P: AsRef<std::path::Path>>(&mut self, directory: P) -> Result<(), AssetLoadError> {
-        let path = self.asset_directory.push(directory);
-        log::info!("Loading assets \"{}\" from \"./{directory}\"", T::ASSET_KIND);
+        let directory_display = directory.as_ref().to_string_lossy();
 
-        let collection = assets::collection::AssetCollection::<T>::load(directory)?;
+        let path = self.asset_directory.join(&directory);
+        log::info!("Loading assets \"{}\" from \"./{directory_display}\"", T::ASSET_KIND);
+
+        let collection = assets::collection::AssetCollection::<T>::load(&path)?;
         log::info!("Loaded {} assets in the \"{}\" collection", collection.count(), T::ASSET_KIND);
 
         let collection = Box::new(collection) as Box<dyn assets::collection::AssetCollectionImpl>;
@@ -43,10 +45,12 @@ impl AssetManager {
         T: assets::GraphicAsset,
         P: AsRef<std::path::Path>,
     {
-        let path = self.asset_directory.push(directory);
-        log::info!("Loading assets \"{}\" from \"./{directory}\"", T::ASSET_KIND);
+        let directory_display = directory.as_ref().to_string_lossy();
 
-        let collection = assets::collection::AssetCollection::<T>::load(directory)?;
+        let path = self.asset_directory.join(&directory);
+        log::info!("Loading assets \"{}\" from \"./{directory_display}\"", T::ASSET_KIND);
+
+        let collection = assets::collection::AssetCollection::<T>::load(&path)?;
         log::info!("Loaded {} assets in the \"{}\" collection", collection.count(), T::ASSET_KIND);
 
         let gpu_buffer_size = collection.assets().iter().map(|asset| asset.size()).sum();
@@ -63,12 +67,13 @@ impl AssetManager {
             let mut storage_buffer = crate::vulkan::StorageBuffer::create(&self.vk_device, gpu_buffer_size)?;
 
             /* transfer staging to storage buffer */
+            let destination_view = storage_buffer.entire_buffer();
             crate::vulkan::copy_buffer(
                 &self.vk_device,
                 &staging_buffer,
                 &mut storage_buffer,
                 staging_buffer.entire_buffer(),
-                storage_buffer.entire_buffer(),
+                destination_view,
             )?;
             let bytes_size = crate::utils::format_byte_size(gpu_buffer_size.get());
             log::info!("\"{}\": allocated {} on the GPU", T::ASSET_KIND, bytes_size);
@@ -84,20 +89,25 @@ impl AssetManager {
 
     /// Attempt to get an asset segment by its name.
     pub fn get_handle<T: assets::Asset>(&self, name: &str) -> Option<assets::AssetHandle<T>> {
-        self.get_storage::<T>().get_handle_from_name(name)
+        self.get_storage::<T>()?.get_handle_from_name(name)
     }
 
     /// Attempt to get a segment from it's handle.
     pub fn get_asset<T: assets::Asset>(&self, handle: &assets::AssetHandle<T>) -> Option<&T> {
-        self.get_storage::<T>().get_asset_from_handle(handle)
+        self.get_storage::<T>()?.get_asset_from_handle(handle)
     }
 
     /// Inner function to get a storage from an asset type
-    fn get_storage<T: assets::Asset>(&self) -> &assets::collection::AssetCollection<T> {
-        self.storages
-            .entry(std::any::TypeId::of::<T>())
-            .or_insert_with(|| Box::new(assets::collection::AssetCollection::<T>::default()))
-            .downcast_mut()
-            .unwrap()
+    fn get_storage<T: assets::Asset>(&self) -> Option<&assets::collection::AssetCollection<T>> {
+        let key = std::any::TypeId::of::<T>();
+        let dyn_collection = self.collections.get(&key)?;
+
+        match (dyn_collection as &dyn std::any::Any).downcast_ref() {
+            Some(res) => Some(res),
+            None => {
+                log::warn!("Invalid asset collection for asset type {}", std::any::type_name::<T>());
+                None
+            }
+        }
     }
 }

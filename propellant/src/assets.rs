@@ -7,7 +7,7 @@ pub use manager::AssetLoadError;
 pub use manager::AssetManager;
 
 /// Trait for assets.
-pub trait Asset: Sized {
+pub trait Asset: Sized + 'static {
     const ASSET_KIND: &'static str;
     type Serialized: Into<Self>;
     fn name(&self) -> &str;

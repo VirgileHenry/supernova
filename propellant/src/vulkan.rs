@@ -1,7 +1,6 @@
 mod buffer;
 mod command_interface;
 mod device;
-mod error;
 mod instance;
 mod physical_devices;
 mod queue;
@@ -11,6 +10,7 @@ mod swapchain;
 mod synchronization;
 mod utils;
 
+pub use ash::vk as ash_vk;
 pub use buffer::BufferView;
 pub use buffer::BufferWriteError;
 pub use buffer::RingInstanceBuffer;
@@ -23,7 +23,6 @@ pub use buffer::copy_buffer;
 pub use command_interface::CommandInterface;
 pub use command_interface::InRecordingCommandBuffer;
 pub use device::VkDeviceHandle;
-pub use error::VkError;
 pub use physical_devices::VkPhysicalDevice;
 pub use physical_devices::VkPhysicalDevices;
 pub use queue::VkQueue;

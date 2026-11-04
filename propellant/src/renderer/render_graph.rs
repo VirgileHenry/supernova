@@ -1,49 +1,54 @@
-mod chain;
-mod create_context;
+mod binding;
 mod node;
-mod rg_impl;
+mod node_chain;
 
-pub use create_context::RenderPassCreateContext;
+pub use binding::Binding;
+pub use binding::BindingStage;
+pub use binding::Bindings;
 pub use node::RenderGraphNode;
-use rg_impl::RenderGraphImpl;
 
-pub trait RenderGraph {
+use crate::renderer::render_pass::RenderPassCreateContext;
+use crate::renderer::render_pass::RenderPassRenderContext;
+use ash::prelude::VkResult;
+
+pub trait RenderGraph: Sized {
+    fn create(context: &RenderPassCreateContext) -> Result<Self, RenderGraphCreateError>;
+    fn render(&mut self, context: &RenderPassRenderContext, input: RenderGraphInput) -> VkResult<RenderGraphOutput>;
+}
+
+pub struct RenderGraphInput;
+pub struct RenderGraphOutput;
+
+pub trait RenderGraphImpl: Sized {
+    type Input;
+    type Output;
     type CreateError: std::error::Error;
-    fn create(context: RenderPassCreateContext) -> Result<Self, Self::CreateError>;
-    fn render(
-        &mut self,
-        vk_device: &crate::vulkan::VkDeviceHandle,
-        assets: &crate::assets::AssetManager,
-        world: &hecs::World,
-        input: RenderGraphInput,
-    ) -> ash::prelude::VkResult<RenderGraphOutput>;
-}
 
-pub struct RenderGraphInput {
-    pub frame_index: usize,
-    pub command_buffer: crate::vulkan::InRecordingCommandBuffer,
-    pub render_area: ash::vk::Rect2D,
-}
-
-pub struct RenderGraphOutput {
-    pub command_buffer: crate::vulkan::InRecordingCommandBuffer,
+    fn create(context: &RenderPassCreateContext) -> Result<Self, Self::CreateError>;
+    fn render(&mut self, context: &RenderPassRenderContext, input: Self::Input) -> VkResult<Self::Output>;
 }
 
 impl<T> RenderGraph for T
 where
     T: RenderGraphImpl<Input = RenderGraphInput, Output = RenderGraphOutput>,
 {
-    type CreateError = T::CreateError;
-    fn create(context: RenderPassCreateContext) -> Result<Self, Self::CreateError> {
-        <T as RenderGraphImpl>::create(context)
+    fn create(context: &RenderPassCreateContext) -> Result<Self, RenderGraphCreateError> {
+        <T as RenderGraphImpl>::create(context).map_err(|e| RenderGraphCreateError(e.to_string()))
     }
-    fn render(
-        &mut self,
-        vk_device: &crate::vulkan::VkDeviceHandle,
-        assets: &crate::assets::AssetManager,
-        world: &hecs::World,
-        input: RenderGraphInput,
-    ) -> ash::prelude::VkResult<RenderGraphOutput> {
-        T::render(self, vk_device, assets, world, input)
+    fn render(&mut self, context: &RenderPassRenderContext, input: RenderGraphInput) -> VkResult<RenderGraphOutput> {
+        T::render(self, context, input)
     }
 }
+
+/// Error when creating the render graph.
+/// This is a hard allocated error message.
+#[derive(Debug)]
+pub struct RenderGraphCreateError(String);
+
+impl std::fmt::Display for RenderGraphCreateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Failed to create render graph: {}", self.0)
+    }
+}
+
+impl std::error::Error for RenderGraphCreateError {}

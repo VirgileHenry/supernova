@@ -1,5 +1,3 @@
-use crate::vulkan;
-
 /// Wrapper around an image swapchain.
 pub struct VkSwapchainImage {
     _image: ash::vk::Image,
@@ -11,7 +9,7 @@ impl VkSwapchainImage {
         vk_device: &crate::vulkan::VkDeviceHandle,
         image: ash::vk::Image,
         format: ash::vk::Format,
-    ) -> Result<VkSwapchainImage, vulkan::VkError> {
+    ) -> ash::prelude::VkResult<VkSwapchainImage> {
         let components = ash::vk::ComponentMapping {
             r: ash::vk::ComponentSwizzle::IDENTITY,
             g: ash::vk::ComponentSwizzle::IDENTITY,

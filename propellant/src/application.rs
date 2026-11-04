@@ -12,4 +12,7 @@ pub trait Application: Sized {
 
     /// Called when the engine is going to shutdown
     fn shutdown(&mut self);
+
+    /// The first scene to load in the engine
+    fn start_scene() -> crate::scene::SceneLoader;
 }

@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, Copy)]
 pub struct Version {
-    pub major: u8,
-    pub minor: u8,
-    pub patch: u8,
+    major: u8,
+    minor: u8,
+    patch: u8,
 }
 
 impl Version {
@@ -18,4 +18,8 @@ impl std::fmt::Display for Version {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
     }
+}
+
+pub fn version(major: u8, minor: u8, patch: u8) -> Version {
+    Version { major, minor, patch }
 }

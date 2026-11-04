@@ -1,5 +1,3 @@
-use crate::vulkan;
-
 mod image;
 
 /// Interface to use the Vulkan swapchain.
@@ -22,7 +20,7 @@ pub struct VkSwapchain {
 }
 
 impl VkSwapchain {
-    pub fn create(vk_context: &vulkan::VulkanContext, previous: Option<&Self>) -> Result<VkSwapchain, vulkan::VkError> {
+    pub fn create(vk_context: &crate::vulkan::VulkanContext, previous: Option<&Self>) -> ash::prelude::VkResult<VkSwapchain> {
         let vk_device = vk_context.device_handle();
         let vk_instance = vk_context.instance();
         let window = &vk_context.window;

@@ -1,9 +1,9 @@
 #[derive(Debug, Clone)]
 pub struct RenderTarget {
     /// Handle to the vulkan device to use the vulkan API.
-    vk_device: crate::vulkan::VkDeviceHandle,
+    pub vk_device: crate::vulkan::VkDeviceHandle,
     /// Target framebuffer to write to.
-    framebuffer: ash::vk::Framebuffer,
+    pub framebuffer: ash::vk::Framebuffer,
 }
 
 impl RenderTarget {
@@ -12,7 +12,7 @@ impl RenderTarget {
         render_pass: ash::vk::RenderPass,
         attachments: &[ash::vk::ImageView],
         extent: ash::vk::Extent2D,
-    ) -> Result<RenderTarget, crate::vulkan::VkError> {
+    ) -> ash::prelude::VkResult<RenderTarget> {
         let framebuffer_create_info = ash::vk::FramebufferCreateInfo {
             render_pass,
             attachment_count: attachments.len() as u32,

@@ -3,6 +3,7 @@ mod components;
 mod constants;
 mod error;
 mod renderer;
+mod scenes;
 mod supernova;
 mod utils;
 

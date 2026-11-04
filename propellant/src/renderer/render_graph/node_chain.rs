@@ -1,4 +1,7 @@
 use crate::renderer::render_graph::RenderGraphImpl;
+use crate::renderer::render_pass::RenderPassCreateContext;
+use crate::renderer::render_pass::RenderPassRenderContext;
+use ash::prelude::VkResult;
 
 pub struct NodeChain<First, Second>
 where
@@ -18,27 +21,21 @@ where
     type Output = Second::Output;
     type CreateError = NodeChainCreateError<First::CreateError, Second::CreateError>;
 
-    fn create(context: crate::renderer::render_graph::RenderPassCreateContext) -> Result<Self, Self::CreateError> {
+    fn create(context: &RenderPassCreateContext) -> Result<Self, Self::CreateError> {
         Ok(Self {
-            first: First::create(context)?,
-            second: Second::create(context)?,
+            first: First::create(context).map_err(|e| NodeChainCreateError::First(e))?,
+            second: Second::create(context).map_err(|e| NodeChainCreateError::Second(e))?,
         })
     }
 
-    fn render(
-        &mut self,
-        vk_device: &crate::vulkan::VkDeviceHandle,
-        assets: &crate::assets::AssetManager,
-        world: &hecs::World,
-        input: Self::Input,
-    ) -> ash::prelude::VkResult<Self::Output> {
-        let mid = self.first.render(vk_device, assets, world, input)?;
-        let output = self.second.render(vk_device, assets, world, mid)?;
+    fn render(&mut self, context: &RenderPassRenderContext, input: Self::Input) -> VkResult<Self::Output> {
+        let mid = self.first.render(context, input)?;
+        let output = self.second.render(context, mid)?;
         Ok(output)
     }
 }
 
-enum NodeChainCreateError<FirstErr, SecondErr> {
+pub enum NodeChainCreateError<FirstErr, SecondErr> {
     First(FirstErr),
     Second(SecondErr),
 }

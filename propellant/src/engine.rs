@@ -45,7 +45,7 @@ impl<App: crate::application::Application> Engine<App> {
 
         // load start scene
         // Fixme: that's not the main menu, need loading scene to load the game up
-        let scene = crate::scene::Scene::test_scene(&vk_context, proxy.clone(), &assets);
+        let scene = crate::scene::Scene::load(App::start_scene());
 
         let application = App::create();
 

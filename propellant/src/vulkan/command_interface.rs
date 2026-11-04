@@ -1,4 +1,5 @@
 use crate::vulkan;
+use ash::prelude::VkResult;
 
 pub struct CommandInterface {
     /// Handle to the vulkan device to use the vulkan API.
@@ -18,7 +19,7 @@ impl CommandInterface {
         vk_device: &vulkan::VkDeviceHandle,
         queue: vulkan::VkRef<vulkan::VkQueue>,
         frame_count: u32,
-    ) -> Result<CommandInterface, vulkan::VkError> {
+    ) -> VkResult<CommandInterface> {
         let create_info = ash::vk::CommandPoolCreateInfo {
             queue_family_index: queue.family(),
             flags: ash::vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
@@ -35,7 +36,7 @@ impl CommandInterface {
         })
     }
 
-    pub fn recreate_command_buffers(&mut self, frame_count: u32) -> Result<(), vulkan::VkError> {
+    pub fn recreate_command_buffers(&mut self, frame_count: u32) -> VkResult<()> {
         let reset_flag = ash::vk::CommandPoolResetFlags::empty();
         unsafe { self.vk_device.reset_command_pool(self.command_pool, reset_flag) }?;
         if self.command_buffers.len() != frame_count as usize {
@@ -49,7 +50,7 @@ impl CommandInterface {
         **self.queue
     }
 
-    pub fn start_recording(&self, index: usize) -> ash::prelude::VkResult<InRecordingCommandBuffer> {
+    pub fn start_recording(&self, index: usize) -> VkResult<InRecordingCommandBuffer> {
         let command_buffer = self.command_buffers[index];
 
         let reset_flag = ash::vk::CommandBufferResetFlags::empty();
@@ -65,7 +66,7 @@ impl CommandInterface {
         vk_device: &vulkan::VkDeviceHandle,
         command_pool: ash::vk::CommandPool,
         frame_count: u32,
-    ) -> Result<Vec<ash::vk::CommandBuffer>, vulkan::VkError> {
+    ) -> VkResult<Vec<ash::vk::CommandBuffer>> {
         let allocate_info = ash::vk::CommandBufferAllocateInfo::default()
             .command_pool(command_pool)
             .level(ash::vk::CommandBufferLevel::PRIMARY)
@@ -114,7 +115,7 @@ impl RecordedCommandBuffer {
         queue: ash::vk::Queue,
         submit_infos: &[ash::vk::SubmitInfo],
         fence: ash::vk::Fence,
-    ) -> Result<(), vulkan::VkError> {
+    ) -> VkResult<()> {
         unsafe {
             device.queue_submit(queue, submit_infos, fence)?;
         }
