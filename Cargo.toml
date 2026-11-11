@@ -16,4 +16,5 @@ bytemuck = "1.25.0"
 env_logger = "0.11.5"
 glam = { version = "0.32.1", features = ["serde"] }
 log = "0.4.22"
+ron = "0.12.3"
 serde = { version = "1.0.228", features = ["derive"] }

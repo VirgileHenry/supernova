@@ -87,14 +87,13 @@ impl<App: crate::application::Application> Engine<App> {
                 }
             }
             winit::event::WindowEvent::Resized(new_size) => {
-                // self.scene.send_system_event(SystemEvent::SwapchainRecreationRequest {
-                //     vk_context: &self.vk_context,
-                //     assets: &self.assets,
-                // });
-                // self.scene.send_system_event(SystemEvent::WindowResize {
-                //     width: new_size.width,
-                //     height: new_size.height,
-                // });
+                use crate::components::Camera;
+                use crate::components::camera::MainCamera;
+
+                /* Set the aspect ratio of each main camera */
+                for (_, main_cam) in self.scene.world().query::<&mut Camera<MainCamera>>().iter() {
+                    main_cam.resize(new_size.width, new_size.height);
+                }
             }
             other => log::debug!("Unhandled window event: {other:?} for window {window_id:?}"),
         }
@@ -103,6 +102,7 @@ impl<App: crate::application::Application> Engine<App> {
     pub fn handle_engine_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: crate::event::EngineEvent) {
         match event {
             crate::event::EngineEvent::SwapchainRecreationRequest => {
+                log::warn!("Ignoring swapchain recreation request")
                 // let event = crate::SystemEvent::SwapchainRecreationRequest {
                 //     vk_context: &self.vk_context,
                 //     assets: &self.assets,
