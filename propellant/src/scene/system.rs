@@ -2,7 +2,6 @@ pub trait System {
     fn name(&self) -> &'static str;
     fn frequency(&self) -> UpdateFrequency;
     fn update(&mut self, assets: &crate::assets::AssetManager, world: &mut hecs::World, delta_time: std::time::Duration);
-    fn handle_event(&mut self, world: &mut hecs::World, event: SystemEvent);
 }
 
 pub enum UpdateFrequency {
@@ -64,10 +63,6 @@ impl SystemWrapper {
                 }
             }
         }
-    }
-
-    pub fn handle_event(&mut self, world: &mut hecs::World, event: SystemEvent) {
-        self.inner.handle_event(world, event);
     }
 }
 

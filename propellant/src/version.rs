@@ -20,6 +20,6 @@ impl std::fmt::Display for Version {
     }
 }
 
-pub fn version(major: u8, minor: u8, patch: u8) -> Version {
+pub const fn version(major: u8, minor: u8, patch: u8) -> Version {
     Version { major, minor, patch }
 }

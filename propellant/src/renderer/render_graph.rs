@@ -6,10 +6,27 @@ pub use binding::Binding;
 pub use binding::BindingStage;
 pub use binding::Bindings;
 pub use node::RenderGraphNode;
+pub use node_chain::NodeChain;
 
 use crate::renderer::render_pass::RenderPassCreateContext;
 use crate::renderer::render_pass::RenderPassRenderContext;
 use ash::prelude::VkResult;
+
+#[macro_export]
+macro_rules! renderer {
+    () => {
+            compile_error!("renderer! needs at least one render pass")
+        };
+        ($pass:ty $(,)?) => {
+            $crate::renderer::RenderGraphNode<$pass>
+        };
+        ($pass:ty, $($rest:ty),+ $(,)?) => {
+            $crate::renderer::NodeChain<
+                $crate::renderer::RenderGraphNode<$pass>,
+                $crate::renderer!($($rest),+)
+            >
+        };
+}
 
 pub trait RenderGraph: Sized {
     fn create(context: &RenderPassCreateContext) -> Result<Self, RenderGraphCreateError>;

@@ -3,6 +3,7 @@ use crate::renderer::render_graph::RenderGraphImpl;
 use crate::renderer::render_pass::RenderPass;
 use crate::renderer::render_pass::RenderPassCreateContext;
 use crate::renderer::render_pass::RenderPassRenderContext;
+use crate::vulkan::MAX_FRAMES_IN_FLIGHT;
 use ash::prelude::VkResult;
 
 pub struct RenderGraphNode<Pass: RenderPass> {
@@ -26,7 +27,7 @@ impl<Pass: RenderPass> RenderGraphImpl for RenderGraphNode<Pass> {
     type Input = Pass::Input;
     type Output = Pass::Output;
 
-    type CreateError = ash::vk::Result;
+    type CreateError = NodeCreateError<Pass::Bindings>;
 
     fn create(context: &RenderPassCreateContext) -> Result<Self, Self::CreateError> {
         let device = context.device;
@@ -136,10 +137,58 @@ impl<Pass: RenderPass> RenderGraphImpl for RenderGraphNode<Pass> {
     }
 
     fn render(&mut self, context: &RenderPassRenderContext, input: Self::Input) -> VkResult<Self::Output> {
-        /* Update all bindings uniform data */
+        let device = context.device;
+        let cmd = *context.command_buffer;
+
+        /* 1. update the bindings' data for this frame (camera, instances...) */
         self.descriptors.bindings.update(context)?;
-        /* Render the node */
-        self.user_render_pass.render(context, input)
+
+        /* 2. begin the render pass */
+        let clear_values = [ash::vk::ClearValue {
+            color: ash::vk::ClearColorValue {
+                float32: [0., 0., 0., 1.],
+            },
+        }];
+
+        let begin_info = ash::vk::RenderPassBeginInfo::default()
+            .render_pass(self.vk_render_pass)
+            .framebuffer(context.target)
+            .render_area(context.render_area)
+            .clear_values(&clear_values);
+
+        let descriptor_sets = [self.descriptors.descriptor_sets[context.frame_index]];
+
+        unsafe {
+            device.cmd_begin_render_pass(cmd, &begin_info, ash::vk::SubpassContents::INLINE);
+            /* 3. pipeline + this frame's descriptor set */
+            device.cmd_bind_pipeline(cmd, ash::vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+            device.cmd_bind_descriptor_sets(
+                cmd,
+                ash::vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_layout,
+                0,
+                &descriptor_sets,
+                &[],
+            );
+        }
+
+        /* 4. the user pass: draws only */
+        let output = self.user_render_pass.render(context, &self.descriptors.bindings, input);
+
+        /* 5. always end the render pass, even if the user pass returned an error */
+        unsafe { device.cmd_end_render_pass(cmd) };
+
+        output
+    }
+}
+
+impl<Pass: RenderPass> Drop for RenderGraphNode<Pass> {
+    fn drop(&mut self) {
+        unsafe {
+            self.vk_device.destroy_pipeline(self.pipeline, None);
+            self.vk_device.destroy_pipeline_layout(self.pipeline_layout, None);
+            self.vk_device.destroy_render_pass(self.vk_render_pass, None);
+        }
     }
 }
 
@@ -188,25 +237,27 @@ fn create_render_pass(
 }
 
 struct RenderPassDescriptors<Bindings: crate::renderer::Bindings> {
+    /// Handle to the vk device
+    vk_device: crate::vulkan::VkDeviceHandle,
     /// Descriptor set layout
     descriptor_set_layout: ash::vk::DescriptorSetLayout,
     /// Descriptor pool
     descriptor_pool: ash::vk::DescriptorPool,
     /// Descriptor sets, one per frame in flight
-    descriptor_sets: [ash::vk::DescriptorSet; crate::vulkan::MAX_FRAMES_IN_FLIGHT],
+    descriptor_sets: [ash::vk::DescriptorSet; MAX_FRAMES_IN_FLIGHT],
 
     bindings: Bindings,
 }
 
 impl<Bindings: crate::renderer::Bindings> RenderPassDescriptors<Bindings> {
-    pub fn create(context: &RenderPassCreateContext) -> VkResult<Self> {
+    pub fn create(context: &RenderPassCreateContext) -> Result<Self, NodeCreateError<Bindings>> {
         let device = context.device;
 
         let desc_set_layout_bindings: Vec<_> = Bindings::desc_set_layout_bindings().collect();
         let descriptor_set_layout_info = ash::vk::DescriptorSetLayoutCreateInfo::default().bindings(&desc_set_layout_bindings);
         let descriptor_set_layout = unsafe { device.create_descriptor_set_layout(&descriptor_set_layout_info, None)? };
 
-        let bindings = Bindings::create(context)?;
+        let bindings = Bindings::create(context).map_err(NodeCreateError::BindingsError)?;
 
         let pool_sizes = [
             ash::vk::DescriptorType::SAMPLER,
@@ -222,30 +273,30 @@ impl<Bindings: crate::renderer::Bindings> RenderPassDescriptors<Bindings> {
             ash::vk::DescriptorType::INPUT_ATTACHMENT,
         ]
         .into_iter()
-        .map(|desc_type| (desc_type, Bindings::count_of_type(desc_type)))
+        .map(|desc_type| (desc_type, Bindings::count_of_type(desc_type) * MAX_FRAMES_IN_FLIGHT as u32))
         .filter(|(_, count)| *count > 0)
         .map(|(desc_type, count)| ash::vk::DescriptorPoolSize::default().ty(desc_type).descriptor_count(count))
         .collect::<Vec<_>>();
 
         let pool_info = ash::vk::DescriptorPoolCreateInfo::default()
             .pool_sizes(&pool_sizes)
-            .max_sets(crate::vulkan::MAX_FRAMES_IN_FLIGHT as u32);
+            .max_sets(MAX_FRAMES_IN_FLIGHT as u32);
 
         let descriptor_pool = unsafe { device.create_descriptor_pool(&pool_info, None)? };
 
-        let descriptor_set_layouts = [descriptor_set_layout; crate::vulkan::MAX_FRAMES_IN_FLIGHT];
+        let descriptor_set_layouts = [descriptor_set_layout; MAX_FRAMES_IN_FLIGHT];
         let alloc_info = ash::vk::DescriptorSetAllocateInfo::default()
             .descriptor_pool(descriptor_pool)
             .set_layouts(&descriptor_set_layouts);
 
-        let descriptor_sets: [ash::vk::DescriptorSet; crate::vulkan::MAX_FRAMES_IN_FLIGHT] = unsafe {
+        let descriptor_sets: [ash::vk::DescriptorSet; MAX_FRAMES_IN_FLIGHT] = unsafe {
             device
                 .allocate_descriptor_sets(&alloc_info)?
                 .try_into()
                 .expect("Descriptor set count mismatch")
         };
 
-        for frame_index in 0..crate::vulkan::MAX_FRAMES_IN_FLIGHT {
+        for frame_index in 0..MAX_FRAMES_IN_FLIGHT {
             let descriptor_buffer_infos: Vec<_> = Bindings::descriptor_buffer_infos(&bindings, frame_index)
                 .map(|(info, ty)| ([info], ty))
                 .collect();
@@ -265,6 +316,7 @@ impl<Bindings: crate::renderer::Bindings> RenderPassDescriptors<Bindings> {
         }
 
         Ok(Self {
+            vk_device: device.clone(),
             descriptor_set_layout,
             descriptor_pool,
             descriptor_sets,
@@ -273,17 +325,42 @@ impl<Bindings: crate::renderer::Bindings> RenderPassDescriptors<Bindings> {
     }
 }
 
-#[derive(Debug)]
-pub enum NodeCreateError {
-    Vulkan(ash::vk::Result),
-}
-
-impl std::fmt::Display for NodeCreateError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Vulkan(error) => write!(f, "Vulkan error: {error}"),
+impl<B: Bindings> Drop for RenderPassDescriptors<B> {
+    fn drop(&mut self) {
+        unsafe {
+            self.vk_device.destroy_descriptor_pool(self.descriptor_pool, None);
+            self.vk_device.destroy_descriptor_set_layout(self.descriptor_set_layout, None);
         }
     }
 }
 
-impl std::error::Error for NodeCreateError {}
+pub enum NodeCreateError<Bindings: crate::renderer::Bindings> {
+    BindingsError(Bindings::CreateError),
+    Vulkan(ash::vk::Result),
+}
+
+impl<Bindings: crate::renderer::Bindings> From<ash::vk::Result> for NodeCreateError<Bindings> {
+    fn from(error: ash::vk::Result) -> Self {
+        Self::Vulkan(error)
+    }
+}
+
+impl<Bindings: crate::renderer::Bindings> std::fmt::Debug for NodeCreateError<Bindings> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BindingsError(err) => write!(f, "NodeCreateError::BindingsError({err})"),
+            Self::Vulkan(err) => write!(f, "NodeCreateError::Vulkan({err})"),
+        }
+    }
+}
+
+impl<Bindings: crate::renderer::Bindings> std::fmt::Display for NodeCreateError<Bindings> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BindingsError(err) => write!(f, "Bindings error: {err}"),
+            Self::Vulkan(err) => write!(f, "Vulkan error: {err}"),
+        }
+    }
+}
+
+impl<Bindings: crate::renderer::Bindings> std::error::Error for NodeCreateError<Bindings> {}

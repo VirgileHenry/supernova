@@ -15,4 +15,8 @@ pub mod vulkan;
 
 pub use vk_shader_macros::include_glsl;
 
+/* Fixme: better export of these */
+pub use winit::event_loop::ControlFlow;
+pub use winit::event_loop::EventLoop;
+
 const ENGINE_NAME: &'static std::ffi::CStr = c"Propellant";

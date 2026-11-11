@@ -4,16 +4,26 @@ mod render_pass;
 mod render_target;
 mod shaders;
 
+pub mod uniforms;
+
+pub use ash::prelude::VkResult;
+pub use error::RendererCreateError;
 pub use render_graph::Binding;
 pub use render_graph::BindingStage;
 pub use render_graph::Bindings;
+pub use render_graph::NodeChain;
+pub use render_graph::RenderGraph;
 pub use render_graph::RenderGraphInput;
+pub use render_graph::RenderGraphNode;
 pub use render_graph::RenderGraphOutput;
 pub use render_pass::RenderPass;
+pub use render_pass::RenderPassCreateContext;
+pub use render_pass::RenderPassRenderContext;
+pub use shaders::ShaderSource;
 
 use crate::vulkan;
 
-pub(crate) struct Renderer<R: render_graph::RenderGraph> {
+pub(crate) struct Renderer<R: RenderGraph> {
     /// Reference to the event loop proxy to send messages to the engine.
     event_loop_proxy: crate::event::EventLoopProxy,
 
@@ -35,7 +45,7 @@ pub(crate) struct Renderer<R: render_graph::RenderGraph> {
     dummy_pass: ash::vk::RenderPass,
 }
 
-impl<R: render_graph::RenderGraph> Renderer<R> {
+impl<R: RenderGraph> Renderer<R> {
     pub fn create(
         vk_context: &vulkan::VulkanContext,
         event_loop_proxy: crate::event::EventLoopProxy,
@@ -46,14 +56,14 @@ impl<R: render_graph::RenderGraph> Renderer<R> {
         let swapchain = vulkan::VkSwapchain::create(vk_context, None)?;
         let synchronization = vulkan::VkSynchronization::create(&vk_device_handle, swapchain.image_count())?;
 
-        let create_context = render_pass::RenderPassCreateContext {
+        let create_context = RenderPassCreateContext {
             device: &vk_device_handle,
             swapchain: &swapchain,
             assets,
         };
 
         let render_graph = R::create(&create_context)?;
-        let dummy_pass = create_reference_render_pass(&vk_device_handle, swapchain.format())?;
+        let dummy_pass = create_color_render_pass(&vk_device_handle, swapchain.format())?;
 
         let image_views = swapchain.image_views();
         let render_targets = image_views
@@ -94,13 +104,13 @@ impl<R: render_graph::RenderGraph> Renderer<R> {
         let new_swapchain = vulkan::VkSwapchain::create(vk_context, Some(&self.swapchain))?;
         self.swapchain = new_swapchain;
 
-        let create_context = render_pass::RenderPassCreateContext {
+        let create_context = RenderPassCreateContext {
             device: &self.vk_device_handle,
             swapchain: &self.swapchain,
             assets,
         };
         self.render_graph = R::create(&create_context)?;
-        self.dummy_pass = create_reference_render_pass(&self.vk_device_handle, self.swapchain.format())?;
+        self.dummy_pass = create_color_render_pass(&self.vk_device_handle, self.swapchain.format())?;
 
         let image_views = self.swapchain.image_views();
         self.render_targets = image_views
@@ -122,7 +132,7 @@ impl<R: render_graph::RenderGraph> Renderer<R> {
         Ok(())
     }
 
-    pub fn render(&mut self, assets: &crate::assets::AssetManager, world: &hecs::World) -> Result<(), error::RenderError> {
+    pub fn render(&mut self, assets: &crate::assets::AssetManager, world: &hecs::World) -> VkResult<()> {
         /* Wait for the frame slot to be usable,  */
         self.synchronization.frame().wait_until_available()?;
 
@@ -136,16 +146,17 @@ impl<R: render_graph::RenderGraph> Renderer<R> {
         self.synchronization.claim_image(image_index)?;
         let target = self.render_targets[image_index].framebuffer;
 
-        let render_context = render_pass::RenderPassRenderContext {
+        let render_context = RenderPassRenderContext {
             device: &self.vk_device_handle,
             world,
             assets,
             command_buffer: self.graphics_command.start_recording(image_index)?,
             frame_index,
             target,
+            render_area: ash::vk::Rect2D::default().extent(self.swapchain.extent()),
         };
 
-        let _output = self.render_graph.render(&render_context, render_graph::RenderGraphInput)?;
+        let _output = self.render_graph.render(&render_context, RenderGraphInput)?;
 
         let recorded_command_buffer = render_context.command_buffer.end_recording(&self.vk_device_handle)?;
 
@@ -181,46 +192,51 @@ impl<R: render_graph::RenderGraph> Renderer<R> {
         self.synchronization.advance();
 
         if acquire.suboptimal {
-            Err(error::RenderError::Vulkan {
-                error: ash::vk::Result::SUBOPTIMAL_KHR,
-            })
+            Err(ash::vk::Result::SUBOPTIMAL_KHR)
         } else {
             Ok(())
         }
     }
 }
 
-impl<R: render_graph::RenderGraph> Drop for Renderer<R> {
+impl<R: RenderGraph> Drop for Renderer<R> {
     fn drop(&mut self) {
         log::info!("Destroying renderer");
         if let Err(e) = unsafe { self.vk_device_handle.device_wait_idle() } {
             log::warn!("Failed to wait device idle for cleanup: {e}");
         }
+        unsafe { self.vk_device_handle.destroy_render_pass(self.dummy_pass, None) };
     }
 }
 
-/// Only used to create framebuffers compatible with the graph's nodes.
-/// Fixme: should be removed at some point it creates a dummy render pass just to have framebuffers ?
-fn create_reference_render_pass(
-    device: &vulkan::VkDeviceHandle,
-    format: ash::vk::Format,
-) -> ash::prelude::VkResult<ash::vk::RenderPass> {
-    let attachment = ash::vk::AttachmentDescription::default()
+/// Single-color-attachment render pass, shared by the renderer (framebuffers) and the nodes.
+pub fn create_color_render_pass(device: &vulkan::VkDeviceHandle, format: ash::vk::Format) -> VkResult<ash::vk::RenderPass> {
+    let color_attachment = ash::vk::AttachmentDescription::default()
         .format(format)
         .samples(ash::vk::SampleCountFlags::TYPE_1)
-        .load_op(ash::vk::AttachmentLoadOp::DONT_CARE)
+        .load_op(ash::vk::AttachmentLoadOp::CLEAR)
         .store_op(ash::vk::AttachmentStoreOp::STORE)
+        .stencil_load_op(ash::vk::AttachmentLoadOp::DONT_CARE)
+        .stencil_store_op(ash::vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(ash::vk::ImageLayout::UNDEFINED)
         .final_layout(ash::vk::ImageLayout::PRESENT_SRC_KHR);
-    let color_ref = [ash::vk::AttachmentReference::default()
+    let color_refs = [ash::vk::AttachmentReference::default()
         .attachment(0)
         .layout(ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)];
-    let subpass = [ash::vk::SubpassDescription::default()
+    let subpasses = [ash::vk::SubpassDescription::default()
         .pipeline_bind_point(ash::vk::PipelineBindPoint::GRAPHICS)
-        .color_attachments(&color_ref)];
-    let attachments = [attachment];
+        .color_attachments(&color_refs)];
+    let dependencies = [ash::vk::SubpassDependency::default()
+        .src_subpass(ash::vk::SUBPASS_EXTERNAL)
+        .dst_subpass(0)
+        .src_stage_mask(ash::vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+        .src_access_mask(ash::vk::AccessFlags::empty())
+        .dst_stage_mask(ash::vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+        .dst_access_mask(ash::vk::AccessFlags::COLOR_ATTACHMENT_WRITE)];
+    let attachments = [color_attachment];
     let info = ash::vk::RenderPassCreateInfo::default()
         .attachments(&attachments)
-        .subpasses(&subpass);
+        .subpasses(&subpasses)
+        .dependencies(&dependencies);
     unsafe { device.create_render_pass(&info, None) }
 }

@@ -4,11 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bytemuck = { workspace = true }
 env_logger = { workspace = true }
 csg = { workspace = true }
 glam = { workspace = true }
 log = { workspace = true }
 propellant = { workspace = true }
+serde = { workspace = true }
+ron = { workspace = true }
 
 [features]
 default = []

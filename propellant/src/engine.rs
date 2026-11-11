@@ -8,6 +8,8 @@ pub struct Engine<App: crate::application::Application> {
 
     /// Scene manager
     scene: crate::scene::Scene, /* Fixme: better scene management */
+    /// Renderer in use for the engine
+    renderer: crate::renderer::Renderer<App::Renderer>,
     /// Asset manager
     assets: crate::assets::AssetManager,
     /// Access to the graphics stack of the engine
@@ -26,6 +28,8 @@ impl<App: crate::application::Application> Engine<App> {
         // TODO: load player preferences as very first task
         // those preferences shall contains stuff as prefered window size (so we can create window directly as full screen) or prefered GPU
 
+        let mut application = App::create();
+
         // very first thing is creating the window!
         // we can use the window to quickly loadup a loading / presentation screen using a very simple API like softbuffer
         let window_attributes = winit::window::WindowAttributes::default().with_title(App::NAME);
@@ -38,23 +42,26 @@ impl<App: crate::application::Application> Engine<App> {
         let vk_context = crate::vulkan::VulkanContext::create(window, App::NAME, App::VERSION)?;
 
         /* Load the assets up */
-        let assets = crate::assets::AssetManager::new(vk_context.device_handle(), "assets")?;
+        let mut assets = crate::assets::AssetManager::new(vk_context.device_handle(), "assets")?;
+        application.load_assets(&mut assets);
+
+        /* Create the renderer */
+        let renderer = crate::renderer::Renderer::create(&vk_context, proxy.clone(), &assets)?;
 
         // loading screen is no longer required, as main resources are created and we can proceed with main loop and let the engine manage
         // drop(loading_screen);
 
         // load start scene
         // Fixme: that's not the main menu, need loading scene to load the game up
-        let scene = crate::scene::Scene::load(App::start_scene());
-
-        let application = App::create();
+        let scene = crate::scene::Scene::load(App::start_scene(), &assets);
 
         Ok(Self {
-            vk_context,
-            scene,
-            last_update: std::time::Instant::now(),
-            assets,
             application,
+            scene,
+            assets,
+            renderer,
+            vk_context,
+            last_update: std::time::Instant::now(),
         })
     }
 
@@ -74,6 +81,10 @@ impl<App: crate::application::Application> Engine<App> {
 
                 self.application.tick(delta_time);
                 self.scene.update(&self.assets, delta_time);
+
+                if let Err(e) = self.renderer.render(&self.assets, &self.scene.world()) {
+                    log::warn!("Failed to render scene: {e}");
+                }
             }
             winit::event::WindowEvent::Resized(new_size) => {
                 // self.scene.send_system_event(SystemEvent::SwapchainRecreationRequest {

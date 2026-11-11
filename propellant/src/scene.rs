@@ -1,18 +1,17 @@
 mod error;
 mod system;
 
+pub use hecs::World;
 pub use system::System;
 pub use system::SystemEvent;
 pub use system::UpdateFrequency;
-
-use crate::vulkan;
 
 /// A Scene is the main container for an ECS and multiple systems.
 pub struct Scene {
     /// Name for the scene, mostly used for debug purposes.
     name: String,
     /// Mapping of entities to components.
-    world: hecs::World,
+    world: World,
     /// The system map regroups all the systems running logic on the world.
     systems: system::SystemMap,
 }
@@ -24,21 +23,23 @@ impl Scene {
         log::info!("Created new scene: \"{name}\"");
         Self {
             name,
-            world: hecs::World::new(),
+            world: World::new(),
             systems: system::SystemMap::new(),
         }
     }
 
-    pub fn load(loader: SceneLoader) -> Self {
+    pub fn world(&self) -> &hecs::World {
+        &self.world
+    }
+
+    pub fn load(loader: SceneLoader, assets: &crate::assets::AssetManager) -> Self {
         let mut scene = Self::empty(loader.name);
-        (loader.loader)(&mut scene);
+        (loader.loader)(&mut scene, assets);
         scene
     }
 
-    pub fn send_system_event(&mut self, event: SystemEvent) {
-        for system in self.systems.iter_mut() {
-            system.handle_event(&mut self.world, event.clone())
-        }
+    pub fn spawn(&mut self, components: impl hecs::DynamicBundle) -> hecs::Entity {
+        self.world.spawn(components)
     }
 
     pub fn load_system<S: system::System + 'static>(&mut self, system: S) {
@@ -55,11 +56,11 @@ impl Scene {
 
 pub struct SceneLoader {
     name: String,
-    loader: Box<dyn FnOnce(&mut Scene)>,
+    loader: Box<dyn FnOnce(&mut Scene, &crate::assets::AssetManager)>,
 }
 
 impl SceneLoader {
-    pub fn new<Loader: FnOnce(&mut Scene) + 'static>(name: &str, loader: Loader) -> Self {
+    pub fn new<Loader: FnOnce(&mut Scene, &crate::assets::AssetManager) + 'static>(name: &str, loader: Loader) -> Self {
         SceneLoader {
             name: name.to_string(),
             loader: Box::new(loader),

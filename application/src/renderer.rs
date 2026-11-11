@@ -6,3 +6,5 @@
 
 mod csg_geometry_pass;
 mod uniforms;
+
+pub type Renderer = propellant::renderer!(csg_geometry_pass::CsgGeometryPass);

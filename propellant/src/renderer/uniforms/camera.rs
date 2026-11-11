@@ -8,9 +8,9 @@ pub struct CameraUniform {
 }
 
 impl CameraUniform {
-    pub fn from_camera_components<Usage: propellant::components::camera::CameraUsage>(
-        transform: &propellant::components::Transform,
-        camera: &propellant::components::Camera<Usage>,
+    pub fn from_camera_components<Usage: crate::components::camera::CameraUsage>(
+        transform: &crate::components::Transform,
+        camera: &crate::components::Camera<Usage>,
     ) -> Self {
         Self {
             view: transform.to_matrix().inverse().to_cols_array_2d(),

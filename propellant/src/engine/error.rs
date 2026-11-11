@@ -6,6 +6,7 @@ pub enum EngineCreateError {
     AssetManagerError(assets::AssetLoadError),
     ContextCreateError(vulkan::VulkanContextCreateError),
     CreateWindowError(winit::error::OsError),
+    RendererCreateError(crate::renderer::RendererCreateError),
 }
 
 impl std::fmt::Display for EngineCreateError {
@@ -14,6 +15,7 @@ impl std::fmt::Display for EngineCreateError {
             Self::AssetManagerError(error) => write!(f, "Failed to load asset manager: {error}"),
             Self::ContextCreateError(error) => write!(f, "Failed to create vulkan context: {error}"),
             Self::CreateWindowError(error) => write!(f, "Failed to create window: {error}"),
+            Self::RendererCreateError(error) => write!(f, "Failed to create renderer: {error}"),
         }
     }
 }
@@ -35,5 +37,11 @@ impl From<vulkan::VulkanContextCreateError> for EngineCreateError {
 impl From<winit::error::OsError> for EngineCreateError {
     fn from(error: winit::error::OsError) -> Self {
         Self::CreateWindowError(error)
+    }
+}
+
+impl From<crate::renderer::RendererCreateError> for EngineCreateError {
+    fn from(error: crate::renderer::RendererCreateError) -> Self {
+        Self::RendererCreateError(error)
     }
 }

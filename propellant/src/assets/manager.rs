@@ -25,89 +25,54 @@ impl AssetManager {
         })
     }
 
-    pub fn load<T: assets::Asset, P: AsRef<std::path::Path>>(&mut self, directory: P) -> Result<(), AssetLoadError> {
-        let directory_display = directory.as_ref().to_string_lossy();
+    pub fn load<Asset: assets::Asset, P: AsRef<std::path::Path>>(&mut self, directory: P) -> Result<(), AssetLoadError> {
+        let path = self.asset_directory.join(directory);
+        let directory_display = path.to_string_lossy();
 
-        let path = self.asset_directory.join(&directory);
-        log::info!("Loading assets \"{}\" from \"./{directory_display}\"", T::ASSET_KIND);
+        log::info!("Loading assets \"{}\" from \"./{directory_display}\"", Asset::ASSET_KIND);
 
-        let collection = assets::collection::AssetCollection::<T>::load(&path)?;
-        log::info!("Loaded {} assets in the \"{}\" collection", collection.count(), T::ASSET_KIND);
-
-        let collection = Box::new(collection) as Box<dyn assets::collection::AssetCollectionImpl>;
-        self.collections.insert(std::any::TypeId::of::<T>(), collection);
-
-        Ok(())
-    }
-
-    pub fn load_graphic<T, P>(&mut self, directory: P) -> Result<(), AssetLoadError>
-    where
-        T: assets::GraphicAsset,
-        P: AsRef<std::path::Path>,
-    {
-        let directory_display = directory.as_ref().to_string_lossy();
-
-        let path = self.asset_directory.join(&directory);
-        log::info!("Loading assets \"{}\" from \"./{directory_display}\"", T::ASSET_KIND);
-
-        let collection = assets::collection::AssetCollection::<T>::load(&path)?;
-        log::info!("Loaded {} assets in the \"{}\" collection", collection.count(), T::ASSET_KIND);
-
-        let gpu_buffer_size = collection.assets().iter().map(|asset| asset.size()).sum();
-
-        if let Some(gpu_buffer_size) = std::num::NonZeroUsize::new(gpu_buffer_size) {
-            let mut staging_buffer = crate::vulkan::StagingBuffer::create(&self.vk_device, gpu_buffer_size)?;
-
-            let mut offset = 0;
-            for asset in collection.assets() {
-                asset.load(&mut staging_buffer, offset);
-                offset += asset.size();
-            }
-
-            let mut storage_buffer = crate::vulkan::StorageBuffer::create(&self.vk_device, gpu_buffer_size)?;
-
-            /* transfer staging to storage buffer */
-            let destination_view = storage_buffer.entire_buffer();
-            crate::vulkan::copy_buffer(
-                &self.vk_device,
-                &staging_buffer,
-                &mut storage_buffer,
-                staging_buffer.entire_buffer(),
-                destination_view,
-            )?;
-            let bytes_size = crate::utils::format_byte_size(gpu_buffer_size.get());
-            log::info!("\"{}\": allocated {} on the GPU", T::ASSET_KIND, bytes_size);
-        } else {
-            log::info!("\"{}\": no GPU allocation", T::ASSET_KIND);
-        }
+        let load_context = AssetLoadingContext {
+            vk_device: &self.vk_device,
+        };
+        let collection = assets::collection::AssetCollection::<Asset>::load(&load_context, &path)?;
+        log::info!(
+            "Loaded {} assets in the \"{}\" collection",
+            collection.count(),
+            Asset::ASSET_KIND
+        );
 
         let collection = Box::new(collection) as Box<dyn assets::collection::AssetCollectionImpl>;
-        self.collections.insert(std::any::TypeId::of::<T>(), collection);
+        self.collections.insert(std::any::TypeId::of::<Asset>(), collection);
 
         Ok(())
     }
 
     /// Attempt to get an asset segment by its name.
-    pub fn get_handle<T: assets::Asset>(&self, name: &str) -> Option<assets::AssetHandle<T>> {
-        self.get_storage::<T>()?.get_handle_from_name(name)
+    pub fn get_handle<Asset: assets::Asset>(&self, name: &str) -> Option<assets::AssetHandle<Asset>> {
+        self.get_collection::<Asset>()?.get_handle_from_name(name)
     }
 
     /// Attempt to get a segment from it's handle.
-    pub fn get_asset<T: assets::Asset>(&self, handle: &assets::AssetHandle<T>) -> Option<&T> {
-        self.get_storage::<T>()?.get_asset_from_handle(handle)
+    pub fn get_asset<Asset: assets::Asset>(&self, handle: &assets::AssetHandle<Asset>) -> Option<&Asset> {
+        self.get_collection::<Asset>()?.get_asset_from_handle(handle)
     }
 
     /// Inner function to get a storage from an asset type
-    fn get_storage<T: assets::Asset>(&self) -> Option<&assets::collection::AssetCollection<T>> {
-        let key = std::any::TypeId::of::<T>();
-        let dyn_collection = self.collections.get(&key)?;
+    pub fn get_collection<Asset: assets::Asset>(&self) -> Option<&assets::collection::AssetCollection<Asset>> {
+        let key = std::any::TypeId::of::<Asset>();
+        let dyn_collection: &dyn assets::collection::AssetCollectionImpl = &**self.collections.get(&key)?;
+        let any: &dyn std::any::Any = dyn_collection; // upcast of the collection, not of the Box
 
-        match (dyn_collection as &dyn std::any::Any).downcast_ref() {
+        match any.downcast_ref::<assets::collection::AssetCollection<Asset>>() {
             Some(res) => Some(res),
             None => {
-                log::warn!("Invalid asset collection for asset type {}", std::any::type_name::<T>());
+                log::error!("Invalid asset collection for asset type {}", std::any::type_name::<Asset>());
                 None
             }
         }
     }
+}
+
+pub struct AssetLoadingContext<'ctx> {
+    pub vk_device: &'ctx crate::vulkan::VkDeviceHandle,
 }

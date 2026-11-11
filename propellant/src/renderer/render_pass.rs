@@ -14,8 +14,12 @@ pub trait RenderPass {
     const VERT_SHADER: crate::renderer::shaders::ShaderSource;
 
     fn create() -> Self;
-    fn update_uniforms(&mut self, context: &RenderPassRenderContext, bindings: &mut Self::Bindings) -> VkResult<()>;
-    fn render(&mut self, context: &RenderPassRenderContext, input: Self::Input) -> VkResult<Self::Output>;
+    fn render(
+        &mut self,
+        context: &RenderPassRenderContext,
+        bindings: &Self::Bindings,
+        input: Self::Input,
+    ) -> VkResult<Self::Output>;
 }
 
 pub struct RenderPassCreateContext<'ctx> {
@@ -31,4 +35,5 @@ pub struct RenderPassRenderContext<'ctx> {
     pub command_buffer: crate::vulkan::InRecordingCommandBuffer,
     pub frame_index: usize,
     pub target: ash::vk::Framebuffer,
+    pub render_area: ash::vk::Rect2D,
 }
